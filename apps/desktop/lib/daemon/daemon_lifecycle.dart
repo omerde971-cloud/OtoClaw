@@ -25,15 +25,33 @@ String findProjectRoot({String? start}) {
 
 /// Starts the daemon as a subprocess.
 ///
-/// TODO(Phase 6): release modunda derlenmiş daemon binary'sine işaret edecek
-/// (bu dev-mode implementasyonu `bun run packages/daemon/src/main.ts` çalıştırır).
+/// Dev mode (running from the monorepo checkout) has the daemon's TS source
+/// on disk, so `bun run` on it works directly. A compiled `desktop.exe`
+/// copied out of the repo (e.g. to the Desktop) has no source tree — only
+/// the sibling `otoclaw-daemon(.exe)` binary (built by
+/// `scripts/build-binary.ts`) next to it, which this branch spawns instead.
 void spawnDaemon({String? projectRoot}) {
   final root = projectRoot ?? findProjectRoot();
   final daemonEntry = p.join(root, 'packages', 'daemon', 'src', 'main.ts');
-  Process.start(
-    'bun',
-    ['run', daemonEntry],
-    mode: ProcessStartMode.detachedWithStdio,
+  if (File(daemonEntry).existsSync()) {
+    Process.start(
+      'bun',
+      ['run', daemonEntry],
+      mode: ProcessStartMode.detachedWithStdio,
+    );
+    return;
+  }
+
+  final exeSuffix = Platform.isWindows ? '.exe' : '';
+  final exeDir = p.dirname(Platform.resolvedExecutable);
+  final siblingDaemon = p.join(exeDir, 'otoclaw-daemon$exeSuffix');
+  if (File(siblingDaemon).existsSync()) {
+    Process.start(siblingDaemon, [], mode: ProcessStartMode.detachedWithStdio);
+    return;
+  }
+
+  throw StateError(
+    'could not find the otoclaw daemon: no source at $daemonEntry and no sibling binary at $siblingDaemon',
   );
 }
 
