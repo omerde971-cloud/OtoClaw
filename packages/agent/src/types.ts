@@ -2,6 +2,7 @@ import type { Config, PipelineStage, Policy, Session } from "@otoclaw/shared";
 import type { PermissionEngine, RiskScore, SessionOverrides } from "@otoclaw/permission";
 import type { Provider } from "@otoclaw/providers";
 import type { ToolContext, ToolRegistry, ToolResult } from "@otoclaw/tools";
+import type { Semaphore } from "./subagents";
 
 export type { PipelineStage };
 
@@ -15,15 +16,36 @@ export interface PlanStep {
 	description: string;
 	kind: "tool" | "code";
 	acceptance: string[];
-	/**
-	 * Explicit routing request from the planner. Phase 1 only implements the "tool"
-	 * route — a "subagent" request is a deliberate scope boundary, rejected by router().
-	 */
+	/** Explicit routing request from the planner. "subagent" spawns an isolated sub-agent (§9). */
 	requestedRoute?: "tool" | "subagent";
+	/** Sub-agent role when requestedRoute is "subagent"; router() defaults to "coder" if omitted. */
+	role?: SubAgentBrief["role"];
 }
 
 export interface Plan {
 	steps: PlanStep[];
+}
+
+/** ARCHITECTURE.md §9 — a precise, structured task handed to a sub-agent, not a vague prompt. */
+export interface SubAgentBrief {
+	role: "researcher" | "coder" | "tester" | "reviewer";
+	goal: string;
+	inputs: Record<string, unknown>;
+	constraints: string[];
+	acceptance: string[];
+	budget: { tokens: number; steps: number };
+}
+
+export interface SubAgentResult {
+	agentId: string;
+	role: SubAgentBrief["role"];
+	ok: boolean;
+	text: string;
+	notes: string[];
+	tokensUsed: number;
+	stepsUsed: number;
+	/** Set only for worktree-isolated (role "coder") sub-agents that produced changes; never merged automatically. */
+	worktree?: { path: string; branch: string; diff: string } | null;
 }
 
 export interface QuestionOption {
@@ -70,6 +92,15 @@ export interface AgentEventMap {
 	"tool.end": { toolCallId: string; name: string; result: ToolResult };
 	"permission.request": { toolCallId: string; tool: string; args: unknown; risk: RiskScore };
 	"review.result": { passed: boolean; notes: string[] };
+	"subagent.spawn": { agentId: string; role: SubAgentBrief["role"]; brief: SubAgentBrief; status: string };
+	"subagent.update": { agentId: string; role: SubAgentBrief["role"]; brief: SubAgentBrief; status: string };
+	"subagent.done": {
+		agentId: string;
+		role: SubAgentBrief["role"];
+		brief: SubAgentBrief;
+		status: string;
+		result: SubAgentResult | null;
+	};
 	error: { code: string; message: string; recoverable: boolean };
 }
 
@@ -97,4 +128,6 @@ export interface RunContext {
 	permissionChannel: PermissionChannel;
 	events: AgentEvents;
 	signal?: AbortSignal;
+	/** Shared concurrency-cap semaphore for sub-agent spawns within this run (ARCHITECTURE.md §9). */
+	subAgentPool?: Semaphore;
 }

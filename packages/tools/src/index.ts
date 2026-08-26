@@ -7,6 +7,6 @@ export * from "./registry";
 import { fsEdit, fsRead, fsWrite } from "./fs";
 import { createDefaultRegistry } from "./registry";
 import { shellRun } from "./shell";
-import { webFetch } from "./web";
+import { webFetch, webSearch } from "./web";
 
-export const defaultToolRegistry = createDefaultRegistry([fsRead, fsWrite, fsEdit, shellRun, webFetch]);
+export const defaultToolRegistry = createDefaultRegistry([fsRead, fsWrite, fsEdit, shellRun, webFetch, webSearch]);

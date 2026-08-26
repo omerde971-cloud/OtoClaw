@@ -121,6 +121,15 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 		events.on("permission.request", () => {
 			sendMascot(sessionId, "waiting");
 		});
+		events.on("subagent.spawn", ({ agentId, role, brief, status }) => {
+			broadcast({ jsonrpc: "2.0", method: "subagent.spawn", params: { sessionId, agentId, role, brief, status } });
+		});
+		events.on("subagent.update", ({ agentId, role, brief, status }) => {
+			broadcast({ jsonrpc: "2.0", method: "subagent.update", params: { sessionId, agentId, role, brief, status } });
+		});
+		events.on("subagent.done", ({ agentId, role, brief, status, result }) => {
+			broadcast({ jsonrpc: "2.0", method: "subagent.done", params: { sessionId, agentId, role, brief, status, result } });
+		});
 		events.on("error", (payload) => {
 			const params: ErrorEventPayload = { sessionId, ...payload };
 			broadcast({ jsonrpc: "2.0", method: "error", params });

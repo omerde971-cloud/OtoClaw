@@ -5,3 +5,4 @@ build/
 *.log
 .otoclaw/
 .DS_Store
+.claude/worktrees/

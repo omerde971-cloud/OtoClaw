@@ -2,19 +2,24 @@ import type { Provider } from "@otoclaw/providers";
 import type { Plan, PlanStep, TaskIntake } from "./types";
 
 const PLANNER_SYSTEM_PROMPT = `You are the planning stage of a coding agent. Respond with ONLY a JSON object of the form:
-{"steps":[{"id":"step-1","description":"...","kind":"tool"|"code","acceptance":["..."]}]}
-Each step is ordered. Use "code" only for steps that write and then must be tested; use "tool" otherwise.`;
+{"steps":[{"id":"step-1","description":"...","kind":"tool"|"code","acceptance":["..."],"requestedRoute":"tool"|"subagent","role":"researcher"|"coder"|"tester"|"reviewer"}]}
+Each step is ordered. Use "code" only for steps that write and then must be tested; use "tool" otherwise.
+Set requestedRoute:"subagent" with a "role" only when the step needs an isolated sub-agent (e.g. web research, an independent code change, a test pass, or a review); omit both fields otherwise.`;
+
+const SUBAGENT_ROLES = new Set(["researcher", "coder", "tester", "reviewer"]);
 
 function normalizeStep(raw: unknown, index: number): PlanStep {
 	const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
 	const kind = obj.kind === "code" ? "code" : "tool";
 	const requestedRoute = obj.requestedRoute === "subagent" ? "subagent" : obj.requestedRoute === "tool" ? "tool" : undefined;
+	const role = typeof obj.role === "string" && SUBAGENT_ROLES.has(obj.role) ? (obj.role as PlanStep["role"]) : undefined;
 	return {
 		id: typeof obj.id === "string" && obj.id.length > 0 ? obj.id : `step-${index + 1}`,
 		description: typeof obj.description === "string" && obj.description.length > 0 ? obj.description : "",
 		kind,
 		acceptance: Array.isArray(obj.acceptance) ? obj.acceptance.filter((a): a is string => typeof a === "string") : [],
 		requestedRoute,
+		role,
 	};
 }
 

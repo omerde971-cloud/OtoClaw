@@ -225,3 +225,56 @@ export type QuestionAskNotification = JsonRpcNotification<"question.ask", Questi
 export type MascotStateNotification = JsonRpcNotification<"mascot.state", MascotStatePayload>;
 export type CostUpdateNotification = JsonRpcNotification<"cost.update", CostUpdatePayload>;
 export type ErrorNotification = JsonRpcNotification<"error", ErrorEventPayload>;
+
+// ---------------------------------------------------------------------------
+// Phase 2a: sub-agent orchestration events. See ARCHITECTURE.md §3.3/§9.
+// ---------------------------------------------------------------------------
+
+export interface SubAgentBriefPayload {
+	role: "researcher" | "coder" | "tester" | "reviewer";
+	goal: string;
+	inputs: Record<string, unknown>;
+	constraints: string[];
+	acceptance: string[];
+	budget: { tokens: number; steps: number };
+}
+
+export interface SubAgentResultPayload {
+	agentId: string;
+	role: SubAgentBriefPayload["role"];
+	ok: boolean;
+	text: string;
+	notes: string[];
+	tokensUsed: number;
+	stepsUsed: number;
+	worktree?: { path: string; branch: string; diff: string } | null;
+}
+
+export interface SubAgentSpawnPayload {
+	sessionId: string;
+	agentId: string;
+	role: SubAgentBriefPayload["role"];
+	brief: SubAgentBriefPayload;
+	status: string;
+}
+
+export interface SubAgentUpdatePayload {
+	sessionId: string;
+	agentId: string;
+	role: SubAgentBriefPayload["role"];
+	brief: SubAgentBriefPayload;
+	status: string;
+}
+
+export interface SubAgentDonePayload {
+	sessionId: string;
+	agentId: string;
+	role: SubAgentBriefPayload["role"];
+	brief: SubAgentBriefPayload;
+	status: string;
+	result: SubAgentResultPayload | null;
+}
+
+export type SubAgentSpawnNotification = JsonRpcNotification<"subagent.spawn", SubAgentSpawnPayload>;
+export type SubAgentUpdateNotification = JsonRpcNotification<"subagent.update", SubAgentUpdatePayload>;
+export type SubAgentDoneNotification = JsonRpcNotification<"subagent.done", SubAgentDonePayload>;

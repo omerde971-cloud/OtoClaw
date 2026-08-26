@@ -4,7 +4,8 @@ import type { AgentEvents } from "./types";
 import { codeTestDebug } from "./codeTestDebug";
 import { intake } from "./intake";
 import { planner } from "./planner";
-import { router, UnsupportedRouteError } from "./router";
+import { router, UnsupportedRouteError, type Route } from "./router";
+import { buildBrief, spawnSubAgent } from "./subagents";
 import type { Plan, PlanStep, RunContext, TaskIntake } from "./types";
 
 /** Default policy decision per permission key when nothing else resolves it (ARCHITECTURE.md §4). */
@@ -29,15 +30,24 @@ interface AccumulatedToolCall {
 }
 
 async function consumeStream(
-	stream: AsyncIterable<{ delta?: string; toolCall?: { id: string; name: string; argsDelta: string } }>,
+	stream: AsyncIterable<{
+		delta?: string;
+		toolCall?: { id: string; name: string; argsDelta: string };
+		usage?: { in: number; out: number };
+	}>,
 	events: AgentEvents,
-): Promise<{ text: string; toolCalls: AccumulatedToolCall[] }> {
+): Promise<{ text: string; toolCalls: AccumulatedToolCall[]; usage: { in: number; out: number } }> {
 	const toolCalls = new Map<string, AccumulatedToolCall>();
 	let text = "";
+	const usage = { in: 0, out: 0 };
 	for await (const chunk of stream) {
 		if (chunk.delta) {
 			text += chunk.delta;
 			events.emit("stream.delta", { text: chunk.delta });
+		}
+		if (chunk.usage) {
+			usage.in += chunk.usage.in;
+			usage.out += chunk.usage.out;
 		}
 		if (chunk.toolCall) {
 			const existing = toolCalls.get(chunk.toolCall.id);
@@ -53,7 +63,7 @@ async function consumeStream(
 			}
 		}
 	}
-	return { text, toolCalls: [...toolCalls.values()] };
+	return { text, toolCalls: [...toolCalls.values()], usage };
 }
 
 function parseArgs(raw: string): unknown {
@@ -69,29 +79,47 @@ export interface ModelToolTurnResult {
 	text: string;
 	blocked: boolean;
 	notes: string[];
+	/** Summed provider token usage (ChatChunk.usage) across every model call this turn made. */
+	usage: { in: number; out: number };
+	/** Number of model calls actually made (bounded by maxTurns). */
+	turnsUsed: number;
+	/** True when the turn limit was hit while the model still had tool calls to act on. */
+	exhausted: boolean;
 }
 
 /**
  * Runs the model⇄tool loop for one step: stream the model, and for each requested tool call,
  * check permission, run it (or block it), feed the result back, and continue until the model
- * stops requesting tools.
+ * stops requesting tools. `maxTurns` bounds how many model calls this turn may make — used by
+ * sub-agents to enforce their step budget (ARCHITECTURE.md §9).
  */
-export async function runModelToolTurn(initialMessages: ChatMessage[], ctx: RunContext): Promise<ModelToolTurnResult> {
+export async function runModelToolTurn(
+	initialMessages: ChatMessage[],
+	ctx: RunContext,
+	maxTurns: number = MAX_TOOL_TURNS,
+): Promise<ModelToolTurnResult> {
 	const messages: ChatMessage[] = [...initialMessages];
 	let blocked = false;
 	const notes: string[] = [];
 	let finalText = "";
+	const usage = { in: 0, out: 0 };
+	let turnsUsed = 0;
+	let exhausted = false;
 
-	for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+	for (let turn = 0; turn < maxTurns; turn++) {
+		turnsUsed = turn + 1;
 		const stream = ctx.provider.chat({
 			model: ctx.model,
 			messages,
 			tools: ctx.toolRegistry.toJsonSchema(),
 			signal: ctx.signal,
 		});
-		const { text, toolCalls } = await consumeStream(stream, ctx.events);
+		const { text, toolCalls, usage: turnUsage } = await consumeStream(stream, ctx.events);
+		usage.in += turnUsage.in;
+		usage.out += turnUsage.out;
 		finalText = text;
 		if (toolCalls.length === 0) break;
+		if (turn === maxTurns - 1) exhausted = true;
 
 		messages.push({
 			role: "assistant",
@@ -149,7 +177,7 @@ export async function runModelToolTurn(initialMessages: ChatMessage[], ctx: RunC
 		}
 	}
 
-	return { text: finalText, blocked, notes };
+	return { text: finalText, blocked, notes, usage, turnsUsed, exhausted };
 }
 
 export interface StepResult {
@@ -176,7 +204,13 @@ export interface RunTaskResult {
 	review: ReviewResult;
 }
 
-async function executeStep(step: PlanStep, ctx: RunContext, testCommand: string): Promise<StepResult> {
+async function executeStep(step: PlanStep, route: Route, ctx: RunContext, testCommand: string): Promise<StepResult> {
+	if (route.kind === "subagent") {
+		const brief = buildBrief(step, route.role);
+		const result = await spawnSubAgent(brief, ctx);
+		return { stepId: step.id, ok: result.ok, notes: result.notes };
+	}
+
 	const messages: ChatMessage[] = [{ role: "user", content: step.description }];
 	const turnResult = await runModelToolTurn(messages, ctx);
 	const stepNotes = [...turnResult.notes];
@@ -208,8 +242,9 @@ export async function runTask(ctx: RunContext, input: RunTaskInput): Promise<Run
 
 	for (const step of plan.steps) {
 		ctx.events.emit("pipeline.stage", { stage: "route" });
+		let route: Route;
 		try {
-			router(step);
+			route = router(step);
 		} catch (err) {
 			if (err instanceof UnsupportedRouteError) {
 				stepResults.push({ stepId: step.id, ok: false, notes: [err.message] });
@@ -219,7 +254,7 @@ export async function runTask(ctx: RunContext, input: RunTaskInput): Promise<Run
 		}
 
 		ctx.events.emit("pipeline.stage", { stage: "execute" });
-		const result = await executeStep(step, ctx, testCommand);
+		const result = await executeStep(step, route, ctx, testCommand);
 		stepResults.push(result);
 	}
 

@@ -47,3 +47,24 @@ export interface Verdict {
 	notes: string[];
 	createdAt: string;
 }
+
+export type SubAgentStatus = "spawned" | "running" | "done" | "failed";
+
+// ARCHITECTURE.md §9 — one spawned sub-agent's record, keyed by the task that spawned it.
+export interface SubAgentRun {
+	id: string;
+	parentTaskId: string;
+	role: "researcher" | "coder" | "tester" | "reviewer";
+	status: SubAgentStatus;
+	budget: { tokens: number; steps: number };
+	result?: {
+		ok: boolean;
+		text: string;
+		notes: string[];
+		tokensUsed: number;
+		stepsUsed: number;
+		worktree?: { path: string; branch: string; diff: string } | null;
+	} | null;
+	createdAt: string;
+	updatedAt: string;
+}

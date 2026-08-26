@@ -7,4 +7,6 @@ export * from "./intake";
 export * from "./planner";
 export * from "./router";
 export * from "./codeTestDebug";
+export * from "./subagents";
+export * from "./worktree";
 export * from "./loop";

@@ -17,16 +17,25 @@ describe("router", () => {
 		expect(route).toEqual({ kind: "tool" });
 	});
 
-	test("rejects a step that explicitly requests the subagent route — Phase 1 does not implement sub-agent orchestration", () => {
-		const step = makeStep({ requestedRoute: "subagent" });
+	test("accepts a step that requests the subagent route, carrying its role through", () => {
+		const route = router(makeStep({ requestedRoute: "subagent", role: "researcher" }));
+		expect(route).toEqual({ kind: "subagent", role: "researcher" });
+	});
+
+	test("defaults a subagent step's role to coder when the planner omits it", () => {
+		const route = router(makeStep({ requestedRoute: "subagent" }));
+		expect(route).toEqual({ kind: "subagent", role: "coder" });
+	});
+
+	test("throws UnsupportedRouteError for a genuinely unknown route string", () => {
+		const step = makeStep({ requestedRoute: "bogus" as unknown as PlanStep["requestedRoute"] });
 		expect(() => router(step)).toThrow(UnsupportedRouteError);
 		try {
 			router(step);
 			throw new Error("expected router to throw");
 		} catch (err) {
 			expect(err).toBeInstanceOf(UnsupportedRouteError);
-			expect((err as UnsupportedRouteError).requestedRoute).toBe("subagent");
-			expect((err as Error).message).toMatch(/not supported in Phase 1/);
+			expect((err as UnsupportedRouteError).requestedRoute).toBe("bogus");
 		}
 	});
 });

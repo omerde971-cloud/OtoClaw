@@ -1,26 +1,33 @@
-import type { PlanStep } from "./types";
+import type { PlanStep, SubAgentBrief } from "./types";
 
 export interface ToolRoute {
 	kind: "tool";
 }
 
-export type Route = ToolRoute;
+export interface SubAgentRoute {
+	kind: "subagent";
+	role: SubAgentBrief["role"];
+}
+
+export type Route = ToolRoute | SubAgentRoute;
 
 /**
- * Phase 1 does not implement sub-agent orchestration (ARCHITECTURE.md §9 is Phase 2 scope).
- * A step that explicitly asks for the "subagent" route is a deliberate, tested boundary —
- * not a silently-ignored request.
+ * planner.ts only ever emits requestedRoute "tool" | "subagent" | undefined — this guards
+ * against any other value slipping through at runtime (e.g. a malformed planner response).
  */
 export class UnsupportedRouteError extends Error {
 	constructor(public readonly requestedRoute: string) {
-		super(`route "${requestedRoute}" is not supported in Phase 1 (sub-agent orchestration is Phase 2)`);
+		super(`route "${requestedRoute}" is not supported`);
 		this.name = "UnsupportedRouteError";
 	}
 }
 
 export function router(step: PlanStep): Route {
-	if (step.requestedRoute === "subagent") {
-		throw new UnsupportedRouteError("subagent");
+	if (step.requestedRoute === undefined || step.requestedRoute === "tool") {
+		return { kind: "tool" };
 	}
-	return { kind: "tool" };
+	if (step.requestedRoute === "subagent") {
+		return { kind: "subagent", role: step.role ?? "coder" };
+	}
+	throw new UnsupportedRouteError(step.requestedRoute);
 }
