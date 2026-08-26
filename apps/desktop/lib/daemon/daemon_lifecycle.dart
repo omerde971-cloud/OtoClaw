@@ -65,7 +65,10 @@ Future<WsClient?> tryConnect(DaemonInfo info) async {
   }
 }
 
-Future<DaemonInfo> waitForDaemon({int timeoutMs = 5000}) async {
+/// 20s, not 5s: a freshly-built, unsigned daemon binary's *first* launch can
+/// take several extra seconds while Windows Defender real-time-scans it
+/// before the process is even allowed to start writing daemon.json.
+Future<DaemonInfo> waitForDaemon({int timeoutMs = 20000}) async {
   final start = DateTime.now();
   while (DateTime.now().difference(start).inMilliseconds < timeoutMs) {
     final info = readDaemonInfo();
