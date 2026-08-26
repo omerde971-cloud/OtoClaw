@@ -42,6 +42,7 @@
         "@otoclaw/permission": "workspace:*",
         "@otoclaw/providers": "workspace:*",
         "@otoclaw/shared": "workspace:*",
+        "@otoclaw/skills": "workspace:*",
         "@otoclaw/tools": "workspace:*",
       },
     },

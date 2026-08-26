@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { chmodSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Database } from "bun:sqlite";
 import {
@@ -28,6 +29,8 @@ import {
 	type JudgeVerdictPayload,
 	type MascotStatePayload,
 	type McpConnectParams,
+	type McpDisconnectParams,
+	type McpDisconnectResult,
 	type McpListResult,
 	type McpServerInfo,
 	type MessageSendParams,
@@ -40,7 +43,11 @@ import {
 	type QuestionAskPayload,
 	type QuestionRespondParams,
 	type RunCancelParams,
+	type SkillInstallParams,
+	type SkillInstallResult,
+	type SkillListResult,
 } from "@otoclaw/shared";
+import { acquireSkill, loadSkillsFromDir, SkillRegistry, type SkillSourceSearch } from "@otoclaw/skills";
 import { defaultToolRegistry, registerMcpTools } from "@otoclaw/tools";
 import { DaemonPermissionChannel, DaemonQuestionChannel, type PendingPermission, type PendingQuestion } from "./channels";
 import { loadConfig, saveConfig } from "./config";
@@ -86,9 +93,25 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 	const runAbortControllers = new Map<string, AbortController>();
 	const lastCost = new Map<string, { tokensIn: number; tokensOut: number; usd: number }>();
 	const mcpRegistry = new McpRegistry();
+	const skillRegistry = new SkillRegistry();
+	/** No real marketplace is wired up yet — every search comes back empty, so acquireSkill resolves "not_found". */
+	const skillSourceSearch: SkillSourceSearch = {
+		async search() {
+			return [];
+		},
+	};
 
 	function broadcastMcpStatus(name: string, status: string, error?: string): void {
 		broadcast({ jsonrpc: "2.0", method: "mcp.status", params: { name, status, error } });
+	}
+
+	/** Loads skills from the project's `skills/` dir and `~/.otoclaw/skills/`; missing dirs are skipped, never fatal. */
+	async function loadConfiguredSkills(): Promise<void> {
+		const dirs = [join(process.cwd(), "skills"), join(homedir(), ".otoclaw", "skills")];
+		for (const dir of dirs) {
+			const skills = await loadSkillsFromDir(dir);
+			for (const skill of skills) skillRegistry.register(skill);
+		}
 	}
 
 	/**
@@ -448,6 +471,51 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 				});
 				return;
 			}
+			case "mcp.disconnect": {
+				const params = request.params as McpDisconnectParams;
+				void mcpRegistry.disconnectOne(params.name).then(() => {
+					broadcastMcpStatus(params.name, "disconnected");
+					const result: McpDisconnectResult = { ok: true };
+					reply(ws, request.id, result);
+				});
+				return;
+			}
+			case "skill.list": {
+				const result: SkillListResult = skillRegistry.list().map((skill) => ({
+					name: skill.manifest.name,
+					description: skill.manifest.description,
+					triggers: skill.manifest.triggers,
+					version: skill.manifest.version,
+					source: skill.manifest.source,
+				}));
+				reply(ws, request.id, result);
+				return;
+			}
+			case "skill.install": {
+				const params = request.params as SkillInstallParams;
+				const questionChannel = new DaemonQuestionChannel("system", pendingQuestions, (payload) => {
+					broadcast({ jsonrpc: "2.0", method: "question.ask", params: payload satisfies QuestionAskPayload });
+				});
+				void acquireSkill(params.name, {
+					registry: skillRegistry,
+					questionChannel,
+					sourceSearch: skillSourceSearch,
+					// skillSourceSearch never returns candidates, so this path is currently unreachable.
+					install: async () => {},
+				})
+					.then((outcome) => {
+						if (outcome !== "installed") {
+							replyError(ws, request.id, `skill "${params.name}" ${outcome}`, -32001);
+							return;
+						}
+						const result: SkillInstallResult = { ok: true };
+						reply(ws, request.id, result);
+					})
+					.catch((err) => {
+						replyError(ws, request.id, err instanceof Error ? err.message : "skill install failed");
+					});
+				return;
+			}
 			default: {
 				replyError(ws, request.id, "Method not found", -32601);
 			}
@@ -471,6 +539,7 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 
 	// Fire-and-forget: connecting configured MCP servers must never block/fail daemon startup.
 	void connectConfiguredMcpServers();
+	void loadConfiguredSkills();
 
 	return {
 		server,

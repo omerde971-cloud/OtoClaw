@@ -48,6 +48,13 @@ export const ConfigSchema = z.object({
 		})
 		.default({ auto: true }),
 	mcpServers: z.array(McpServerConfigSchema).default([]),
+	// Phase 2e — off by default; when off, judge() keeps its Phase 2b single-judge behavior as-is.
+	judgeCouncil: z
+		.object({
+			enabled: z.boolean(),
+			lenses: z.array(z.string()),
+		})
+		.default({ enabled: false, lenses: ["correctness", "functional", "aesthetics"] }),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

@@ -43,6 +43,13 @@ export class McpRegistry {
 		this.handles.clear();
 	}
 
+	async disconnectOne(name: string): Promise<void> {
+		const handle = this.handles.get(name);
+		if (!handle) return;
+		await handle.close();
+		this.handles.delete(name);
+	}
+
 	get(name: string): McpClientHandle | undefined {
 		return this.handles.get(name);
 	}
