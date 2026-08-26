@@ -3,6 +3,8 @@ export * from "./fs";
 export * from "./shell";
 export * from "./web";
 export * from "./browser-test";
+export * from "./github";
+export * from "./youtube";
 export * from "./registry";
 
 import { browserTest } from "./browser-test";

@@ -60,7 +60,7 @@ import {
 	type VisionDescribeParams,
 } from "@otoclaw/shared";
 import { acquireSkill, loadSkillsFromDir, SkillRegistry, type SkillSourceSearch } from "@otoclaw/skills";
-import { defaultToolRegistry, registerMcpTools } from "@otoclaw/tools";
+import { createGithubTool, createYoutubeTool, defaultToolRegistry, registerMcpTools } from "@otoclaw/tools";
 import { capture as visionCapture, describe as visionDescribe } from "@otoclaw/vision";
 import { DaemonPermissionChannel, DaemonQuestionChannel, type PendingPermission, type PendingQuestion } from "./channels";
 import { loadConfig, saveConfig } from "./config";
@@ -156,6 +156,22 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 			} catch (err) {
 				console.error(`[mcp] failed to register tools for "${attempt.name}": ${err instanceof Error ? err.message : String(err)}`);
 			}
+		}
+	}
+
+	/**
+	 * GitHub/YouTube tools need a token/API key before they're useful, so they're
+	 * registered only when one is present in the keychain — never unconditionally
+	 * like the fs/shell/web tools in defaultToolRegistry.
+	 */
+	async function connectConfiguredIntegrationTools(): Promise<void> {
+		const githubToken = await keyStore.get("github");
+		if (githubToken) {
+			defaultToolRegistry.register(createGithubTool({ token: githubToken }));
+		}
+		const youtubeApiKey = await keyStore.get("youtube");
+		if (youtubeApiKey) {
+			defaultToolRegistry.register(createYoutubeTool({ apiKey: youtubeApiKey }));
 		}
 	}
 
@@ -655,6 +671,7 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 	// Fire-and-forget: connecting configured MCP servers must never block/fail daemon startup.
 	void connectConfiguredMcpServers();
 	void loadConfiguredSkills();
+	void connectConfiguredIntegrationTools();
 
 	return {
 		server,
