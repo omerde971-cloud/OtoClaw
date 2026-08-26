@@ -8,7 +8,8 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@otoclaw/shared": "workspace:*"
+		"@otoclaw/shared": "workspace:*",
+		"playwright": "^1.62.1"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit"

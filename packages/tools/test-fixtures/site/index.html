@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Browser Test Fixture</title>
+</head>
+<body>
+	<form id="greet-form">
+		<input type="text" id="name" name="name" />
+		<input type="email" id="email" name="email" />
+		<button type="submit" id="submit-btn">Submit</button>
+	</form>
+	<div id="success-message" style="display: none;"></div>
+
+	<script>
+		document.getElementById("greet-form").addEventListener("submit", (event) => {
+			event.preventDefault();
+			var name = document.getElementById("name").value;
+			var successEl = document.getElementById("success-message");
+			successEl.textContent = `Merhaba, ${name}!`;
+			successEl.style.display = "block";
+		});
+	</script>
+</body>
+</html>
