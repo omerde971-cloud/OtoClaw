@@ -9,6 +9,7 @@
 	},
 	"scripts": {
 		"start": "bun run src/main.ts",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"build": "bun run build.ts"
 	}
 }
