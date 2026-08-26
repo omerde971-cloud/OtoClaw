@@ -2,7 +2,9 @@
 	"name": "otoclaw",
 	"private": true,
 	"workspaces": [
-		"packages/*"
+		"packages/*",
+		"apps/*",
+		"apps/*/native-host"
 	],
 	"packageManager": "bun@1.4.0",
 	"scripts": {

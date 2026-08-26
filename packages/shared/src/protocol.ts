@@ -355,3 +355,119 @@ export interface SubAgentDonePayload {
 export type SubAgentSpawnNotification = JsonRpcNotification<"subagent.spawn", SubAgentSpawnPayload>;
 export type SubAgentUpdateNotification = JsonRpcNotification<"subagent.update", SubAgentUpdatePayload>;
 export type SubAgentDoneNotification = JsonRpcNotification<"subagent.done", SubAgentDonePayload>;
+
+// ---------------------------------------------------------------------------
+// Phase 4: browser extension bridge + screen vision wire types.
+// See ARCHITECTURE.md §14/§15/§21 Phase 4. Deliberately excludes the DOM
+// automation, browser.test tool, and real vision capture/describe logic —
+// those are Phase 4b/4c/4d.
+// ---------------------------------------------------------------------------
+
+export interface BridgeRegisterParams {
+	role: "bridge";
+}
+
+export type BridgeRegisterResult = OkResult;
+
+export type BridgeRegisterRequest = JsonRpcRequest<"bridge.register", BridgeRegisterParams>;
+
+export interface BrowserAttachParams {
+	[key: string]: never;
+}
+
+export interface BrowserAttachResult {
+	attached: boolean;
+	extensionVersion?: string;
+}
+
+export interface BrowserStatusParams {
+	[key: string]: never;
+}
+
+export interface BrowserStatusResult {
+	status: "disconnected" | "connected" | "error";
+	error?: string;
+}
+
+export interface BrowserNavigateParams {
+	sessionId: string;
+	url: string;
+}
+
+export type BrowserNavigateResult = OkResult;
+
+export type BrowserAction =
+	| { type: "click"; selector: string }
+	| { type: "type"; selector: string; text: string }
+	| { type: "waitFor"; selector: string; timeoutMs?: number }
+	| { type: "screenshot" };
+
+export interface BrowserActParams {
+	sessionId: string;
+	action: BrowserAction;
+}
+
+export interface BrowserActResult {
+	ok: boolean;
+	error?: string;
+}
+
+export interface BrowserScreenshotParams {
+	sessionId: string;
+}
+
+export interface BrowserScreenshotResult {
+	dataUrl: string;
+}
+
+export type BrowserAttachRequest = JsonRpcRequest<"browser.attach", BrowserAttachParams>;
+export type BrowserStatusRequest = JsonRpcRequest<"browser.status", BrowserStatusParams>;
+export type BrowserNavigateRequest = JsonRpcRequest<"browser.navigate", BrowserNavigateParams>;
+export type BrowserActRequest = JsonRpcRequest<"browser.act", BrowserActParams>;
+export type BrowserScreenshotRequest = JsonRpcRequest<"browser.screenshot", BrowserScreenshotParams>;
+
+export interface VisionCaptureParams {
+	sessionId: string;
+	region?: { x: number; y: number; w: number; h: number };
+}
+
+export interface VisionCaptureResult {
+	frameId: string;
+	path: string;
+}
+
+export interface VisionDescribeParams {
+	sessionId: string;
+	frameId: string;
+	prompt?: string;
+}
+
+export interface VisionDescribeResult {
+	text: string;
+}
+
+export type VisionCaptureRequest = JsonRpcRequest<"vision.capture", VisionCaptureParams>;
+export type VisionDescribeRequest = JsonRpcRequest<"vision.describe", VisionDescribeParams>;
+
+export interface BrowserCursorPayload {
+	sessionId: string;
+	x: number;
+	y: number;
+	action: "move" | "click";
+}
+
+export interface BrowserEventPayload {
+	sessionId: string;
+	kind: "navigated" | "error";
+	detail: string;
+}
+
+export interface VisionFramePayload {
+	sessionId: string;
+	frameId: string;
+	path: string;
+}
+
+export type BrowserCursorNotification = JsonRpcNotification<"browser.cursor", BrowserCursorPayload>;
+export type BrowserEventNotification = JsonRpcNotification<"browser.event", BrowserEventPayload>;
+export type VisionFrameNotification = JsonRpcNotification<"vision.frame", VisionFramePayload>;

@@ -9,6 +9,8 @@ const BASE_RISK_BY_PERMISSION_KEY: Record<string, number> = {
 	shell: 50,
 	"web.fetch": 20,
 	mcp: 40,
+	browser: 45,
+	vision: 15,
 };
 
 function baseRisk(permissionKey: string): number {

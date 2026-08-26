@@ -8,6 +8,8 @@ const projectPolicy: Policy = {
 	"shell.deny": ["rm -rf *"],
 	"fs.write": "allow",
 	"web.fetch": "deny",
+	browser: "ask",
+	vision: "ask",
 };
 
 const globalConfig: Config = {
@@ -66,6 +68,24 @@ test("resolution order matrix: session > project-policy > global-config > tool-d
 		globalConfig: { ...globalConfig, permissions: { "web.search": "deny" } },
 	});
 	expect(withProjectMiss).toEqual({ decision: "deny", source: "global-config" });
+});
+
+test("project browser policy overrides tool default", () => {
+	const result = resolvePolicy({
+		permissionKey: "browser",
+		toolDefault: "ask",
+		projectPolicy: { ...projectPolicy, browser: "allow" },
+	});
+	expect(result).toEqual({ decision: "allow", source: "project-policy" });
+});
+
+test("vision falls back to global config when no project policy is present", () => {
+	const result = resolvePolicy({
+		permissionKey: "vision",
+		toolDefault: "ask",
+		globalConfig: { ...globalConfig, permissions: { ...globalConfig.permissions, vision: "deny" } },
+	});
+	expect(result).toEqual({ decision: "deny", source: "global-config" });
 });
 
 test("project fs.write allow overrides global fs.write deny", () => {

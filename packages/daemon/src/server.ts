@@ -20,6 +20,15 @@ import {
 import {
 	ConfigSchema,
 	DaemonRuntimeInfoSchema,
+	type BridgeRegisterParams,
+	type BridgeRegisterResult,
+	type BrowserActParams,
+	type BrowserActResult,
+	type BrowserAttachResult,
+	type BrowserNavigateParams,
+	type BrowserScreenshotParams,
+	type BrowserScreenshotResult,
+	type BrowserStatusResult,
 	type ConfigSetParams,
 	type EchoNotification,
 	type ErrorEventPayload,
@@ -37,6 +46,7 @@ import {
 	type ModeSetParams,
 	type ModelInfo,
 	type ModelSetParams,
+	type OkResult,
 	type PermissionRequestPayload,
 	type PermissionRespondParams,
 	type ProviderAddKeyParams,
@@ -46,9 +56,12 @@ import {
 	type SkillInstallParams,
 	type SkillInstallResult,
 	type SkillListResult,
+	type VisionCaptureParams,
+	type VisionDescribeParams,
 } from "@otoclaw/shared";
 import { acquireSkill, loadSkillsFromDir, SkillRegistry, type SkillSourceSearch } from "@otoclaw/skills";
 import { defaultToolRegistry, registerMcpTools } from "@otoclaw/tools";
+import { capture as visionCapture, describe as visionDescribe } from "@otoclaw/vision";
 import { DaemonPermissionChannel, DaemonQuestionChannel, type PendingPermission, type PendingQuestion } from "./channels";
 import { loadConfig, saveConfig } from "./config";
 import { stageMascotState, toolMascotState } from "./mascot";
@@ -91,6 +104,9 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 	const pendingPermissions = new Map<string, PendingPermission>();
 	const pendingQuestions = new Map<string, PendingQuestion>();
 	const runAbortControllers = new Map<string, AbortController>();
+	/** Bridge-role clients (the native messaging host). Currently a single bridge is supported. */
+	const bridgeClients = new Set<WsLike>();
+	const pendingBridgeRequests = new Map<string, { resolve: (result: unknown) => void; reject: (err: Error) => void }>();
 	const lastCost = new Map<string, { tokensIn: number; tokensOut: number; usd: number }>();
 	const mcpRegistry = new McpRegistry();
 	const skillRegistry = new SkillRegistry();
@@ -146,6 +162,28 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 	function broadcast<TMethod extends string, TParams>(notification: JsonRpcNotification<TMethod, TParams>): void {
 		const raw = JSON.stringify(notification);
 		for (const client of clients) client.send(raw);
+	}
+
+	function getBridgeClient(): WsLike | undefined {
+		for (const client of bridgeClients) return client;
+		return undefined;
+	}
+
+	/**
+	 * Forwards a JSON-RPC request to the connected bridge (native messaging host) and
+	 * resolves with its response, id-correlated the same way pendingPermissions/pendingQuestions
+	 * correlate WS round trips.
+	 */
+	function bridgeRequest<TResult>(method: string, params: unknown): Promise<TResult> {
+		const bridge = getBridgeClient();
+		if (!bridge) {
+			return Promise.reject(new Error("no browser bridge connected"));
+		}
+		const id = randomUUID();
+		return new Promise<TResult>((resolve, reject) => {
+			pendingBridgeRequests.set(id, { resolve: resolve as (result: unknown) => void, reject });
+			bridge.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+		});
 	}
 
 	function sendMascot(sessionId: string, state: string): void {
@@ -232,11 +270,17 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 			},
 			close(ws) {
 				clients.delete(ws);
+				if (bridgeClients.delete(ws) && bridgeClients.size === 0) {
+					for (const pending of pendingBridgeRequests.values()) {
+						pending.reject(new Error("bridge disconnected"));
+					}
+					pendingBridgeRequests.clear();
+				}
 			},
 			message(ws, raw) {
-				let request: JsonRpcRequest;
+				let parsed: unknown;
 				try {
-					request = JSON.parse(raw.toString());
+					parsed = JSON.parse(raw.toString());
 				} catch {
 					ws.send(
 						JSON.stringify({
@@ -248,6 +292,23 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 					return;
 				}
 
+				// A message with no "method" is a response the bridge is sending back to a
+				// bridgeRequest() call, not a new JSON-RPC request.
+				if (!(parsed && typeof parsed === "object" && "method" in parsed)) {
+					const response = parsed as JsonRpcResponse;
+					const pending = pendingBridgeRequests.get(String(response.id));
+					if (pending) {
+						pendingBridgeRequests.delete(String(response.id));
+						if (response.error) {
+							pending.reject(new Error(response.error.message));
+						} else {
+							pending.resolve(response.result);
+						}
+					}
+					return;
+				}
+
+				const request = parsed as JsonRpcRequest;
 				try {
 					handleRequest(request, ws);
 				} catch (err) {
@@ -514,6 +575,60 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 					.catch((err) => {
 						replyError(ws, request.id, err instanceof Error ? err.message : "skill install failed");
 					});
+				return;
+			}
+			case "bridge.register": {
+				const params = request.params as BridgeRegisterParams;
+				if (params.role === "bridge") {
+					bridgeClients.add(ws);
+				}
+				const result: BridgeRegisterResult = { ok: true };
+				reply(ws, request.id, result);
+				return;
+			}
+			case "browser.attach": {
+				const result: BrowserAttachResult = { attached: bridgeClients.size > 0 };
+				reply(ws, request.id, result);
+				return;
+			}
+			case "browser.status": {
+				const result: BrowserStatusResult = { status: bridgeClients.size > 0 ? "connected" : "disconnected" };
+				reply(ws, request.id, result);
+				return;
+			}
+			case "browser.navigate": {
+				const params = request.params as BrowserNavigateParams;
+				bridgeRequest<OkResult>("browser.navigate", params)
+					.then((result) => reply(ws, request.id, result))
+					.catch((err) => replyError(ws, request.id, err instanceof Error ? err.message : "browser.navigate failed"));
+				return;
+			}
+			case "browser.act": {
+				const params = request.params as BrowserActParams;
+				bridgeRequest<BrowserActResult>("browser.act", params)
+					.then((result) => reply(ws, request.id, result))
+					.catch((err) => replyError(ws, request.id, err instanceof Error ? err.message : "browser.act failed"));
+				return;
+			}
+			case "browser.screenshot": {
+				const params = request.params as BrowserScreenshotParams;
+				bridgeRequest<BrowserScreenshotResult>("browser.screenshot", params)
+					.then((result) => reply(ws, request.id, result))
+					.catch((err) => replyError(ws, request.id, err instanceof Error ? err.message : "browser.screenshot failed"));
+				return;
+			}
+			case "vision.capture": {
+				const params = request.params as VisionCaptureParams;
+				visionCapture(params)
+					.then((result) => reply(ws, request.id, result))
+					.catch((err) => replyError(ws, request.id, err instanceof Error ? err.message : "vision.capture failed"));
+				return;
+			}
+			case "vision.describe": {
+				const params = request.params as VisionDescribeParams;
+				visionDescribe(params)
+					.then((result) => reply(ws, request.id, result))
+					.catch((err) => replyError(ws, request.id, err instanceof Error ? err.message : "vision.describe failed"));
 				return;
 			}
 			default: {

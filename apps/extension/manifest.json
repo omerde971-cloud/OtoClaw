@@ -1,0 +1,18 @@
+{
+	"manifest_version": 3,
+	"name": "OtoClaw Bridge",
+	"version": "0.1.0",
+	"description": "Bridges the OtoClaw agent to your browser: API-less Google automation, site testing, and an orange virtual cursor you can watch act.",
+	"permissions": ["activeTab", "scripting", "nativeMessaging"],
+	"background": {
+		"service_worker": "dist/background/service-worker.js",
+		"type": "module"
+	},
+	"content_scripts": [
+		{
+			"matches": ["<all_urls>"],
+			"js": ["dist/content/bootstrap.js"],
+			"run_at": "document_idle"
+		}
+	]
+}

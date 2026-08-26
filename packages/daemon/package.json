@@ -11,7 +11,8 @@
 		"@otoclaw/tools": "workspace:*",
 		"@otoclaw/permission": "workspace:*",
 		"@otoclaw/mcp": "workspace:*",
-		"@otoclaw/skills": "workspace:*"
+		"@otoclaw/skills": "workspace:*",
+		"@otoclaw/vision": "workspace:*"
 	},
 	"scripts": {
 		"dev": "bun run src/main.ts",

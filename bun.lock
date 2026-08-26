@@ -10,6 +10,20 @@
         "typescript": "^7.0.2",
       },
     },
+    "apps/extension": {
+      "name": "@otoclaw/extension",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/chrome": "^0.0.287",
+      },
+    },
+    "apps/extension/native-host": {
+      "name": "@otoclaw/extension-native-host",
+      "version": "0.0.0",
+      "dependencies": {
+        "@otoclaw/shared": "workspace:*",
+      },
+    },
     "packages/agent": {
       "name": "@otoclaw/agent",
       "version": "0.0.0",
@@ -44,6 +58,7 @@
         "@otoclaw/shared": "workspace:*",
         "@otoclaw/skills": "workspace:*",
         "@otoclaw/tools": "workspace:*",
+        "@otoclaw/vision": "workspace:*",
       },
     },
     "packages/mcp": {
@@ -161,6 +176,10 @@
 
     "@otoclaw/daemon": ["@otoclaw/daemon@workspace:packages/daemon"],
 
+    "@otoclaw/extension": ["@otoclaw/extension@workspace:apps/extension"],
+
+    "@otoclaw/extension-native-host": ["@otoclaw/extension-native-host@workspace:apps/extension/native-host"],
+
     "@otoclaw/mcp": ["@otoclaw/mcp@workspace:packages/mcp"],
 
     "@otoclaw/permission": ["@otoclaw/permission@workspace:packages/permission"],
@@ -176,6 +195,14 @@
     "@otoclaw/vision": ["@otoclaw/vision@workspace:packages/vision"],
 
     "@types/bun": ["@types/bun@1.4.0", "", { "dependencies": { "bun-types": "1.4.0" } }, "sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ=="],
+
+    "@types/chrome": ["@types/chrome@0.0.287", "", { "dependencies": { "@types/filesystem": "*", "@types/har-format": "*" } }, "sha512-wWhBNPNXZHwycHKNYnexUcpSbrihVZu++0rdp6GEk5ZgAglenLx+RwdEouh6FrHS0XQiOxSd62yaujM1OoQlZQ=="],
+
+    "@types/filesystem": ["@types/filesystem@0.0.36", "", { "dependencies": { "@types/filewriter": "*" } }, "sha512-vPDXOZuannb9FZdxgHnqSwAG/jvdGM8Wq+6N4D/d80z+D4HWH+bItqsZaVRQykAn6WEVeEkLm2oQigyHtgb0RA=="],
+
+    "@types/filewriter": ["@types/filewriter@0.0.33", "", {}, "sha512-xFU8ZXTw4gd358lb2jw25nxY9QAgqn2+bKKjKOYfNCzN4DKCFetK7sPtrlpg66Ywe3vWY9FNxprZawAh9wfJ3g=="],
+
+    "@types/har-format": ["@types/har-format@1.2.16", "", {}, "sha512-fluxdy7ryD3MV6h8pTfTYpy/xQzCFC7m89nOH9y94cNqJ1mDIDPut7MnRHI3F6qRmh/cT2fUjG1MLdCNb4hE9A=="],
 
     "@types/node": ["@types/node@26.3.0", "", { "dependencies": { "undici-types": "~8.3.0" } }, "sha512-L3fgrnchriRC2ExBflb8j4uZZURHZfQsmQeyVzhjcHW4kkwVyo8/0h1B2MVzMTrYUJYu6G7EWs14hW/L9putqw=="],
 

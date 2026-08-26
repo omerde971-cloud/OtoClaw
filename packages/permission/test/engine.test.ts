@@ -11,7 +11,7 @@ test("manual mode always returns ask, regardless of policy", () => {
 		cmd: "npm install",
 		mode: "manual",
 		toolDefault: "ask",
-		projectPolicy: { shell: "allow", "shell.allow": ["npm *"], "shell.deny": [], "fs.write": "allow", "web.fetch": "allow" },
+		projectPolicy: { shell: "allow", "shell.allow": ["npm *"], "shell.deny": [], "fs.write": "allow", "web.fetch": "allow", browser: "ask", vision: "ask" },
 	});
 	expect(result.decision).toBe("ask");
 	expect(result.escalate).toBe(false);
@@ -24,6 +24,8 @@ test("auto mode + dangerous command always escalates, even when shell.allow woul
 		"shell.deny": [],
 		"fs.write": "allow",
 		"web.fetch": "allow",
+		browser: "ask",
+		vision: "ask",
 	};
 	const result = engine.check({
 		toolName: "shell.run",
@@ -57,6 +59,8 @@ test("auto mode + shell.allow match for a safe command allows silently", () => {
 		"shell.deny": [],
 		"fs.write": "ask",
 		"web.fetch": "ask",
+		browser: "ask",
+		vision: "ask",
 	};
 	const result = engine.check({
 		toolName: "shell.run",
@@ -78,6 +82,8 @@ test("auto mode + shell.deny match blocks without escalating a button question",
 		"shell.deny": ["git push *"],
 		"fs.write": "ask",
 		"web.fetch": "ask",
+		browser: "ask",
+		vision: "ask",
 	};
 	const result = engine.check({
 		toolName: "shell.run",
@@ -110,6 +116,30 @@ test("auto mode + mcp permission key with no policy override defaults to ask (ba
 	});
 	expect(result.decision).toBe("ask");
 	expect(result.risk.score).toBe(40);
+	expect(result.sandboxRequired).toBe(true);
+});
+
+test("auto mode + browser permission key with no policy override defaults to ask (base risk 45)", () => {
+	const result = engine.check({
+		toolName: "browser.navigate",
+		permissionKey: "browser",
+		mode: "auto",
+		toolDefault: "ask",
+	});
+	expect(result.decision).toBe("ask");
+	expect(result.risk.score).toBe(45);
+	expect(result.sandboxRequired).toBe(true);
+});
+
+test("auto mode + vision permission key with no policy override defaults to ask (base risk 15)", () => {
+	const result = engine.check({
+		toolName: "vision.capture",
+		permissionKey: "vision",
+		mode: "auto",
+		toolDefault: "ask",
+	});
+	expect(result.decision).toBe("ask");
+	expect(result.risk.score).toBe(15);
 	expect(result.sandboxRequired).toBe(true);
 });
 

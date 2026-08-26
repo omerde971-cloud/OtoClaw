@@ -7,6 +7,8 @@ const POLICY_FIELD_BY_PERMISSION_KEY: Partial<Record<string, keyof Policy>> = {
 	shell: "shell",
 	"fs.write": "fs.write",
 	"web.fetch": "web.fetch",
+	browser: "browser",
+	vision: "vision",
 };
 
 export interface ResolvePolicyInput {
