@@ -247,6 +247,50 @@ export type SkillInstallResult = OkResult;
 export type SkillListRequest = JsonRpcRequest<"skill.list", SkillListParams>;
 export type SkillInstallRequest = JsonRpcRequest<"skill.install", SkillInstallParams>;
 
+// ---------------------------------------------------------------------------
+// Phase 2d: MCP host wire types. See ARCHITECTURE.md §12.
+// ---------------------------------------------------------------------------
+
+export interface McpConnectParams {
+	name: string;
+}
+
+export interface McpConnectResult {
+	ok: boolean;
+	status: string;
+	error?: string;
+}
+
+export interface McpDisconnectParams {
+	name: string;
+}
+
+export type McpDisconnectResult = OkResult;
+
+export interface McpListParams {
+	[key: string]: never;
+}
+
+export interface McpServerInfo {
+	name: string;
+	transport: "stdio" | "http";
+	status: string;
+}
+
+export type McpListResult = McpServerInfo[];
+
+export type McpConnectRequest = JsonRpcRequest<"mcp.connect", McpConnectParams>;
+export type McpDisconnectRequest = JsonRpcRequest<"mcp.disconnect", McpDisconnectParams>;
+export type McpListRequest = JsonRpcRequest<"mcp.list", McpListParams>;
+
+export interface McpStatusPayload {
+	name: string;
+	status: string;
+	error?: string;
+}
+
+export type McpStatusNotification = JsonRpcNotification<"mcp.status", McpStatusPayload>;
+
 export type StreamDeltaNotification = JsonRpcNotification<"stream.delta", StreamDeltaPayload>;
 export type PipelineStageNotification = JsonRpcNotification<"pipeline.stage", PipelineStagePayload>;
 export type ToolStartNotification = JsonRpcNotification<"tool.start", ToolStartPayload>;

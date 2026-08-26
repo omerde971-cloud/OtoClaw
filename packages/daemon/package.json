@@ -9,7 +9,8 @@
 		"@otoclaw/agent": "workspace:*",
 		"@otoclaw/providers": "workspace:*",
 		"@otoclaw/tools": "workspace:*",
-		"@otoclaw/permission": "workspace:*"
+		"@otoclaw/permission": "workspace:*",
+		"@otoclaw/mcp": "workspace:*"
 	},
 	"scripts": {
 		"dev": "bun run src/main.ts",

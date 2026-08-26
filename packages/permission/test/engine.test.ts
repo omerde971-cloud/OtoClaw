@@ -101,6 +101,18 @@ test("sandboxRequired is always true in auto mode, never toggled by policy", () 
 	expect(result.sandboxRequired).toBe(true);
 });
 
+test("auto mode + mcp permission key with no policy override defaults to ask (base risk 40)", () => {
+	const result = engine.check({
+		toolName: "mcp.fixture.add",
+		permissionKey: "mcp",
+		mode: "auto",
+		toolDefault: "ask",
+	});
+	expect(result.decision).toBe("ask");
+	expect(result.risk.score).toBe(40);
+	expect(result.sandboxRequired).toBe(true);
+});
+
 test("sandboxRequired is false in manual mode", () => {
 	const result = engine.check({
 		toolName: "fs.write",
