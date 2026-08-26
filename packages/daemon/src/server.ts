@@ -6,6 +6,7 @@ import type { Database } from "bun:sqlite";
 import {
 	type AgentEvents,
 	NodeAgentEvents,
+	type RunTaskResult,
 	runTask,
 } from "@otoclaw/agent";
 import { McpRegistry } from "@otoclaw/mcp";
@@ -56,6 +57,9 @@ import {
 	type SkillInstallParams,
 	type SkillInstallResult,
 	type SkillListResult,
+	type TaskStatusParams,
+	type TaskStatusResult,
+	type TaskStatusVerdict,
 	type VisionCaptureParams,
 	type VisionDescribeParams,
 } from "@otoclaw/shared";
@@ -65,7 +69,7 @@ import { capture as visionCapture, describe as visionDescribe } from "@otoclaw/v
 import { DaemonPermissionChannel, DaemonQuestionChannel, type PendingPermission, type PendingQuestion } from "./channels";
 import { loadConfig, saveConfig } from "./config";
 import { stageMascotState, toolMascotState } from "./mascot";
-import { createSession, getSession, otoclawDir, saveVerdict } from "./store";
+import { createSession, getSession, getTaskStatus, listVerdicts, otoclawDir, saveTaskStatus, saveVerdict } from "./store";
 
 interface WsData {
 	authenticated: true;
@@ -352,6 +356,15 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 		ws.send(JSON.stringify(response));
 	}
 
+	function summarizeRun(result: RunTaskResult): string {
+		const stepCount = result.stepResults.length;
+		const okCount = result.stepResults.filter((r) => r.ok).length;
+		const notes = result.review.notes.filter((n) => n.length > 0);
+		const parts = [`${okCount}/${stepCount} steps ok`, result.review.passed ? "review passed" : "review failed"];
+		if (notes.length > 0) parts.push(notes.join("; "));
+		return parts.join(" — ");
+	}
+
 	async function runMessage(sessionId: string, text: string): Promise<void> {
 		const state = getOrCreateState(sessionId);
 		const model = state.model ?? loadConfig().model;
@@ -368,6 +381,12 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 		runAbortControllers.set(sessionId, abortController);
 		const events = wireEvents(sessionId);
 
+		// Marks the run as in-flight in sqlite *before* awaiting runTask() below, so
+		// task.status has something to report even if every WS client (including the one
+		// that sent this message) disconnects before the run finishes — runTask() itself
+		// keeps executing regardless of who's still listening to the broadcast() events.
+		saveTaskStatus(db, sessionId, "running", "run in progress");
+
 		try {
 			const { provider, model: resolvedModel } = await resolveProvider(model, keyStore);
 			const permissionChannel = new DaemonPermissionChannel(sessionId, pendingPermissions, state.sessionOverrides, (payload) => {
@@ -378,7 +397,7 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 				sendMascot(sessionId, "waiting");
 			});
 
-			await runTask(
+			const result = await runTask(
 				{
 					session: { id: sessionId, cwd: state.cwd, mode: state.mode, createdAt: new Date().toISOString() },
 					provider,
@@ -405,17 +424,22 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 				params: { sessionId, ...lastCost.get(sessionId) },
 			});
 			sendMascot(sessionId, "done");
+
+			const summary = summarizeRun(result);
+			saveTaskStatus(db, sessionId, result.review.passed ? "done" : "failed", summary);
 		} catch (err) {
+			const message = err instanceof Error ? err.message : "run failed";
 			broadcast({
 				jsonrpc: "2.0",
 				method: "error",
 				params: {
 					sessionId,
 					code: "run_failed",
-					message: err instanceof Error ? err.message : "run failed",
+					message,
 					recoverable: true,
 				} satisfies ErrorEventPayload,
 			});
+			saveTaskStatus(db, sessionId, "failed", message);
 		} finally {
 			runAbortControllers.delete(sessionId);
 		}
@@ -451,6 +475,21 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 				const messageId = randomUUID();
 				reply(ws, request.id, { messageId });
 				void runMessage(params.sessionId, params.text);
+				return;
+			}
+			case "task.status": {
+				const params = request.params as TaskStatusParams;
+				const row = getTaskStatus(db, params.sessionId);
+				const verdicts: TaskStatusVerdict[] = listVerdicts(db, params.sessionId).map((v) => ({
+					target: v.targetId,
+					score: v.score,
+					label: v.label,
+					notes: v.notes,
+				}));
+				const result: TaskStatusResult = row
+					? { status: row.status, summary: row.summary, verdicts }
+					: { status: "not_found", summary: "", verdicts };
+				reply(ws, request.id, result);
 				return;
 			}
 			case "run.cancel": {

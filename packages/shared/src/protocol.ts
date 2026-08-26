@@ -136,6 +136,36 @@ export interface ProviderAddKeyParams {
 export type ConfigGetResult = Config;
 export type ConfigSetResult = OkResult;
 
+// ---------------------------------------------------------------------------
+// "Submit and forget": message.send starts runTask() in the background and the daemon
+// keeps running it to completion even after every WS client disconnects (see
+// packages/daemon/src/server.ts's runMessage). task.status lets a client that reconnects
+// later — possibly a different WS connection than the one that sent the message — poll
+// the persisted outcome of that session's most recent run instead of relying on live
+// stream/event broadcasts it may have missed while disconnected.
+// ---------------------------------------------------------------------------
+
+export interface TaskStatusParams {
+	sessionId: string;
+}
+
+export interface TaskStatusVerdict {
+	target: string;
+	score: number;
+	label: "good" | "bad";
+	notes: string[];
+}
+
+export type TaskRunStatus = "not_found" | "pending" | "running" | "blocked" | "done" | "failed";
+
+export interface TaskStatusResult {
+	status: TaskRunStatus;
+	summary: string;
+	verdicts: TaskStatusVerdict[];
+}
+
+export type TaskStatusRequest = JsonRpcRequest<"task.status", TaskStatusParams>;
+
 export type MessageSendRequest = JsonRpcRequest<"message.send", MessageSendParams>;
 export type RunCancelRequest = JsonRpcRequest<"run.cancel", RunCancelParams>;
 export type ModeSetRequest = JsonRpcRequest<"mode.set", ModeSetParams>;

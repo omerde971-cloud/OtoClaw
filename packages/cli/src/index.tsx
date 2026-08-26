@@ -60,14 +60,35 @@ async function waitForDaemon(timeoutMs = 5000): Promise<DaemonInfo> {
  * `otoclaw-daemon` binary (built by scripts/build-binary.ts) that this branch
  * spawns instead.
  */
+/**
+ * Detaching the daemon so it survives the CLI process (window closed, Ctrl+C, terminal
+ * killed) needs two separate things, not one:
+ *  - `detached: true` — Bun.spawn's own equivalent of Node's child_process `detached`.
+ *    POSIX: setsid(), a new session/process-group leader. Windows: UV_PROCESS_DETACHED,
+ *    so the child isn't tied to the parent's console and isn't auto-killed by whatever
+ *    Job Object the parent belongs to (many terminals/IDEs/CI runners put every process
+ *    they launch in a job with "kill all on job close" — without `detached`, closing the
+ *    CLI's window can silently take the daemon down with it even though the daemon is a
+ *    separate OS process). Confirmed empirically: with `unref()` alone (no `detached`),
+ *    the daemon process disappeared the moment its immediate parent exited on Windows in
+ *    this repo's dev/CI setup; adding `detached: true` fixed it.
+ *  - `.unref()` — a Bun/JS-runtime-level flag, not an OS one. By default Bun waits for
+ *    every child it spawned before letting the parent's event loop finish, so without
+ *    this the CLI process itself would hang around (unable to exit on its own) even
+ *    though the daemon is already OS-level detached.
+ * `stdio: "ignore"` on top of both matters too — inherited pipes/handles can keep a
+ * process alive independent of either mechanism above.
+ */
 function spawnDaemon(): void {
 	const daemonEntry = join(import.meta.dir, "..", "..", "daemon", "src", "main.ts");
 	if (existsSync(daemonEntry)) {
-		Bun.spawn(["bun", "run", daemonEntry], {
+		const proc = Bun.spawn(["bun", "run", daemonEntry], {
 			stdout: "ignore",
 			stderr: "ignore",
 			stdin: "ignore",
+			detached: true,
 		});
+		proc.unref();
 		return;
 	}
 
@@ -78,11 +99,13 @@ function spawnDaemon(): void {
 			`could not find the otoclaw daemon: no source at ${daemonEntry} and no sibling binary at ${siblingDaemon}`,
 		);
 	}
-	Bun.spawn([siblingDaemon], {
+	const proc = Bun.spawn([siblingDaemon], {
 		stdout: "ignore",
 		stderr: "ignore",
 		stdin: "ignore",
+		detached: true,
 	});
+	proc.unref();
 }
 
 async function ensureConnectedClient(): Promise<WsClient> {
