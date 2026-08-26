@@ -48,6 +48,7 @@ import {
 	type ModelInfo,
 	type ModelSetParams,
 	type OkResult,
+	type PermissionDecisionValue,
 	type PermissionRequestPayload,
 	type PermissionRespondParams,
 	type ProviderAddKeyParams,
@@ -445,6 +446,29 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 		}
 	}
 
+	/**
+	 * Per-action risk/default for `browser.act`. Read-only/draft-preparation actions (opening
+	 * the inbox, filling a compose/event draft) default to allow in Auto mode so a "check my
+	 * inbox and prepare replies" task doesn't stall on prompts; actions that actually send/save
+	 * (gmailSendDraft, calendarSaveEvent) default to ask, so Auto mode only sends/saves silently
+	 * once the user has explicitly set the "browser" permission key to "always" in their own
+	 * policy/config — the resolution order (session > project policy > global config > this
+	 * default) still applies via PermissionEngine.check(), same as every other permission key.
+	 */
+	const BROWSER_ACTION_POLICY: Record<string, { risk: number; toolDefault: PermissionDecisionValue }> = {
+		gmailReadInbox: { risk: 10, toolDefault: "allow" },
+		gmailComposeDraft: { risk: 10, toolDefault: "allow" },
+		gmailSendDraft: { risk: 70, toolDefault: "ask" },
+		calendarCreateEvent: { risk: 10, toolDefault: "allow" },
+		calendarSaveEvent: { risk: 70, toolDefault: "ask" },
+	};
+
+	function browserActionPolicy(actionType: string): { risk: number; toolDefault: PermissionDecisionValue } {
+		return BROWSER_ACTION_POLICY[actionType] ?? { risk: 45, toolDefault: "ask" };
+	}
+
+	const permissionEngine = new PermissionEngine();
+
 	function handleRequest(request: JsonRpcRequest, ws: WsLike): void {
 		switch (request.method) {
 			case "session.create": {
@@ -660,9 +684,49 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 			}
 			case "browser.act": {
 				const params = request.params as BrowserActParams;
-				bridgeRequest<BrowserActResult>("browser.act", params)
-					.then((result) => reply(ws, request.id, result))
-					.catch((err) => replyError(ws, request.id, err instanceof Error ? err.message : "browser.act failed"));
+				const state = getOrCreateState(params.sessionId);
+				const toolName = `browser.act.${params.action.type}`;
+				const { risk, toolDefault } = browserActionPolicy(params.action.type);
+
+				const check = permissionEngine.check({
+					toolName,
+					permissionKey: "browser",
+					mode: state.mode,
+					toolDefault,
+					sessionOverrides: state.sessionOverrides,
+					projectPolicy: null,
+					globalConfig: loadConfig(),
+					riskOverride: risk,
+				});
+
+				const proceed = (): void => {
+					bridgeRequest<BrowserActResult>("browser.act", params)
+						.then((result) => reply(ws, request.id, result))
+						.catch((err) => replyError(ws, request.id, err instanceof Error ? err.message : "browser.act failed"));
+				};
+
+				if (check.decision === "ask" || check.escalate) {
+					const permissionChannel = new DaemonPermissionChannel(params.sessionId, pendingPermissions, state.sessionOverrides, (payload) => {
+						broadcast({ jsonrpc: "2.0", method: "permission.request", params: payload satisfies PermissionRequestPayload });
+					});
+					permissionChannel
+						.request({ toolCallId: randomUUID(), toolName, args: params.action, risk: check.risk })
+						.then((answer) => {
+							if (answer === "allow") {
+								proceed();
+							} else {
+								replyError(ws, request.id, `permission denied for browser.act (${params.action.type})`, -32001);
+							}
+						});
+					return;
+				}
+
+				if (check.decision === "deny" || check.decision === "never") {
+					replyError(ws, request.id, `permission denied for browser.act (${params.action.type})`, -32001);
+					return;
+				}
+
+				proceed();
 				return;
 			}
 			case "browser.screenshot": {

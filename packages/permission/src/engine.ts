@@ -28,6 +28,8 @@ export interface PermissionCheckInput {
 	sessionOverrides?: SessionOverrides;
 	projectPolicy?: Policy | null;
 	globalConfig?: Config | null;
+	/** Overrides the permission key's base risk score for this specific call (e.g. distinguishing a read-only vs. a send/save action within the broad "browser" key). */
+	riskOverride?: number;
 }
 
 export class PermissionEngine {
@@ -35,7 +37,7 @@ export class PermissionEngine {
 		if (input.mode === "manual") {
 			return {
 				decision: "ask",
-				risk: { score: baseRisk(input.permissionKey), reasons: ["manual mode always asks"] },
+				risk: { score: input.riskOverride ?? baseRisk(input.permissionKey), reasons: ["manual mode always asks"] },
 				escalate: false,
 				sandboxRequired: false,
 			};
@@ -88,7 +90,7 @@ export class PermissionEngine {
 		});
 
 		const risk: RiskScore = {
-			score: baseRisk(input.permissionKey),
+			score: input.riskOverride ?? baseRisk(input.permissionKey),
 			reasons: [`resolved via ${resolution.source}`],
 		};
 

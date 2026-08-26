@@ -94,3 +94,43 @@ new/different Chrome profile or machine.
 If you edit `native-host/src/`, re-run `bun run build.ts` in `native-host/` — the registered
 host manifest already points at the resulting `.exe` path, so no re-registration is needed
 unless you move the checkout.
+
+## Periodic inbox checks ("check my inbox every 15 minutes")
+
+OtoClaw does not run a built-in cron/watcher for this — the daemon already runs 24/7 and
+executes every `message.send` task as "submit and forget" (see `packages/daemon/src/server.ts`'s
+`runMessage`: the task keeps running to completion even if nothing is listening), so a
+"check my inbox periodically" behavior is just an external scheduler calling `message.send`
+on a timer with a task like *"gelen kutumu kontrol et, yeni mailleri özetleyip taslak cevap
+hazırla"*. The planner turns that into `browser.act` calls (`gmailReadInbox` then one
+`gmailComposeDraft` per new email — see `packages/agent/src/planner.ts`), and whether a
+prepared draft is ever actually sent (`gmailSendDraft`) is gated by the permission engine:
+in Manual mode it always asks; in Auto mode it follows your `browser` permission policy
+(default `ask`; set it to `always` in `.otoclaw/policy.json` or global config if you want
+fully autonomous sending).
+
+Use [`scripts/watch-inbox.ps1`](../../scripts/watch-inbox.ps1) as the thing your scheduler
+calls — it's a one-shot script that opens the daemon's WebSocket, submits the task, and
+exits (the daemon does the actual work in the background):
+
+```powershell
+pwsh -File scripts/watch-inbox.ps1 -Cwd "C:\path\to\your\project"
+```
+
+To run it every 15 minutes on Windows via Task Scheduler:
+
+1. Open **Task Scheduler** → **Create Task…** (not "Basic Task", so you get the full trigger
+   options below).
+2. **General** tab: name it e.g. `OtoClaw Inbox Watch`; check **Run whether user is logged on
+   or not** if you want it to fire even when locked.
+3. **Triggers** tab → **New…** → **Begin the task: On a schedule** → **Repeat task every:**
+   `15 minutes`, for a duration of `Indefinitely`.
+4. **Actions** tab → **New…** → **Action: Start a program**:
+   - **Program/script**: `pwsh.exe` (or `powershell.exe`)
+   - **Add arguments**: `-File "C:\path\to\otoclaw\scripts\watch-inbox.ps1" -Cwd "C:\path\to\your\project"`
+5. Save. Make sure the OtoClaw daemon (step 5 above) is already running and stays running —
+   the task only *queues* the check; it doesn't start the daemon itself.
+
+This is deliberately just an external trigger — no new scheduling system was added to
+OtoClaw. Any other scheduler (a Linux `cron` entry calling the same `message.send` RPC, a
+`launchd` plist, etc.) works the same way.

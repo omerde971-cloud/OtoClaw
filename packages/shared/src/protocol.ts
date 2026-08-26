@@ -430,7 +430,12 @@ export type BrowserAction =
 	| { type: "click"; selector: string }
 	| { type: "type"; selector: string; text: string }
 	| { type: "waitFor"; selector: string; timeoutMs?: number }
-	| { type: "screenshot" };
+	| { type: "screenshot" }
+	| { type: "gmailReadInbox" }
+	| { type: "gmailComposeDraft"; to: string; subject: string; body: string }
+	| { type: "gmailSendDraft" }
+	| { type: "calendarCreateEvent"; title: string }
+	| { type: "calendarSaveEvent" };
 
 export interface BrowserActParams {
 	sessionId: string;
@@ -440,6 +445,7 @@ export interface BrowserActParams {
 export interface BrowserActResult {
 	ok: boolean;
 	error?: string;
+	data?: unknown;
 }
 
 export interface BrowserScreenshotParams {

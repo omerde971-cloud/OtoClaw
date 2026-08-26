@@ -14,12 +14,17 @@ export type BackgroundToContentMessage =
 export type ContentAction =
 	| { type: "click"; selector: string }
 	| { type: "type"; selector: string; text: string }
-	| { type: "waitFor"; selector: string; timeoutMs?: number };
+	| { type: "waitFor"; selector: string; timeoutMs?: number }
+	| { type: "gmailReadInbox" }
+	| { type: "gmailComposeDraft"; to: string; subject: string; body: string }
+	| { type: "gmailSendDraft" }
+	| { type: "calendarCreateEvent"; title: string }
+	| { type: "calendarSaveEvent" };
 
 export type ContentToBackgroundMessage =
 	| { type: "pong" }
 	| { type: "navigated"; url: string }
-	| { type: "actResult"; ok: boolean; error?: string }
+	| { type: "actResult"; ok: boolean; error?: string; data?: unknown }
 	| { type: "screenshotResult"; dataUrl: string }
 	| { type: "cursor"; x: number; y: number; action: "move" | "click" };
 

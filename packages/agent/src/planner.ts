@@ -4,7 +4,8 @@ import type { Plan, PlanStep, TaskIntake } from "./types";
 const PLANNER_SYSTEM_PROMPT = `You are the planning stage of a coding agent. Respond with ONLY a JSON object of the form:
 {"steps":[{"id":"step-1","description":"...","kind":"tool"|"code","acceptance":["..."],"requestedRoute":"tool"|"subagent","role":"researcher"|"coder"|"tester"|"reviewer"}]}
 Each step is ordered. Use "code" only for steps that write and then must be tested; use "tool" otherwise.
-Set requestedRoute:"subagent" with a "role" only when the step needs an isolated sub-agent (e.g. web research, an independent code change, a test pass, or a review); omit both fields otherwise.`;
+Set requestedRoute:"subagent" with a "role" only when the step needs an isolated sub-agent (e.g. web research, an independent code change, a test pass, or a review); omit both fields otherwise.
+Example: for "check my inbox and draft replies to new emails", plan tool steps that call the browser.act tool with a gmailReadInbox action first, then one gmailComposeDraft action per email needing a reply — never a gmailSendDraft action unless the user explicitly asked you to send, not just draft.`;
 
 const SUBAGENT_ROLES = new Set(["researcher", "coder", "tester", "reviewer"]);
 

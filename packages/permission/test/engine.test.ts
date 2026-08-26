@@ -158,6 +158,28 @@ test("auto mode + github permission key with no policy override defaults to ask 
 	expect(result.sandboxRequired).toBe(true);
 });
 
+test("riskOverride replaces the permission key's base risk score, both in manual and auto mode", () => {
+	const manual = engine.check({
+		toolName: "browser.act.gmailSendDraft",
+		permissionKey: "browser",
+		mode: "manual",
+		toolDefault: "ask",
+		riskOverride: 70,
+	});
+	expect(manual.risk.score).toBe(70);
+	expect(manual.decision).toBe("ask");
+
+	const auto = engine.check({
+		toolName: "browser.act.gmailComposeDraft",
+		permissionKey: "browser",
+		mode: "auto",
+		toolDefault: "allow",
+		riskOverride: 10,
+	});
+	expect(auto.risk.score).toBe(10);
+	expect(auto.decision).toBe("allow");
+});
+
 test("sandboxRequired is false in manual mode", () => {
 	const result = engine.check({
 		toolName: "fs.write",
