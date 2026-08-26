@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Automation Target</title>
+</head>
+<body>
+	<form id="demo-form">
+		<label for="name-input">Name</label>
+		<input id="name-input" name="name" type="text" placeholder="Your name" />
+		<button id="submit-btn" type="button">Submit</button>
+	</form>
+	<div id="result"></div>
+
+	<script>
+		document.getElementById("submit-btn").addEventListener("click", () => {
+			var name = document.getElementById("name-input").value;
+			document.getElementById("result").textContent = name ? `Hello, ${name}!` : "Please enter a name.";
+		});
+	</script>
+</body>
+</html>
