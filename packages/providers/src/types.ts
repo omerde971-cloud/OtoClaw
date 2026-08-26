@@ -1,6 +1,21 @@
+export interface ChatTextPart {
+	type: "text";
+	text: string;
+}
+
+export interface ChatImagePart {
+	type: "image";
+	data: string; // base64-encoded image bytes
+	mimeType: string;
+}
+
+export type ChatContentPart = ChatTextPart | ChatImagePart;
+
 export interface ChatMessage {
 	role: "user" | "assistant" | "system" | "tool";
-	content: string;
+	// Plain string for text-only messages (the common case); an array of parts lets a
+	// vision-capable call (§15) attach image data alongside text without a breaking change.
+	content: string | ChatContentPart[];
 	toolCallId?: string;
 	toolCalls?: Array<{ id: string; name: string; args: string }>;
 }
