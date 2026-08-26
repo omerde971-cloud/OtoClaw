@@ -116,6 +116,7 @@
       "name": "@otoclaw/vision",
       "version": "0.0.0",
       "dependencies": {
+        "@otoclaw/providers": "workspace:*",
         "@otoclaw/shared": "workspace:*",
       },
     },

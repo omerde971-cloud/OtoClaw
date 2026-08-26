@@ -158,7 +158,20 @@ test("browser.navigate errors when no bridge is connected", async () => {
 	expect(response.error?.message).toContain("no browser bridge connected");
 });
 
-test("vision.capture surfaces the Phase 4d not-implemented error", async () => {
+test("vision.capture writes a frame and returns its id/path (Phase 4d)", async () => {
+	// vision.capture() writes under os.homedir()/.otoclaw/cache/vision — point homedir at a
+	// scratch dir for this test so it never touches the real user's ~/.otoclaw cache.
+	const fakeHome = join(tmpdir(), `otoclaw-bridge-home-${randomUUID()}`);
+	const originalUserProfile = process.env.USERPROFILE;
+	const originalHome = process.env.HOME;
+	process.env.USERPROFILE = fakeHome;
+	process.env.HOME = fakeHome;
+	cleanupFns.push(() => {
+		process.env.USERPROFILE = originalUserProfile;
+		process.env.HOME = originalHome;
+		existsSync(fakeHome) && rmSync(fakeHome, { recursive: true, force: true });
+	});
+
 	const dbPath = join(tmpdir(), `otoclaw-bridge-${randomUUID()}.db`);
 	const db = openStore(dbPath);
 	cleanupFns.push(() => db.close());
@@ -172,6 +185,11 @@ test("vision.capture surfaces the Phase 4d not-implemented error", async () => {
 
 	client.send(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "vision.capture", params: { sessionId: "s1" } }));
 
-	const response = (await waitFor(() => findResponse(clientMessages, 1))) as { error?: { message: string } };
-	expect(response.error?.message).toContain("not implemented");
+	const response = (await waitFor(() => findResponse(clientMessages, 1))) as {
+		error?: { message: string };
+		result?: { frameId?: string; path?: string };
+	};
+	expect(response.error).toBeUndefined();
+	expect(response.result?.frameId).toBeTruthy();
+	expect(response.result?.path).toContain(fakeHome);
 });
