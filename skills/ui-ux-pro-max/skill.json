@@ -1,0 +1,26 @@
+{
+	"name": "ui-ux-pro-max",
+	"description": "UI/UX design intelligence for web, mobile, and desktop. Use when designing, building, reviewing, or fixing interfaces, including pages, components, design systems, accessibility, interaction, responsive layout, typography, color, charts, and stack-specific UI implementation.",
+	"triggers": [
+		"ui",
+		"ux",
+		"arayüz",
+		"kullanıcı deneyimi",
+		"kullanılabilirlik",
+		"accessibility",
+		"erişilebilirlik",
+		"component",
+		"bileşen",
+		"responsive",
+		"navigation",
+		"navigasyon",
+		"animation",
+		"animasyon",
+		"chart",
+		"grafik",
+		"design system",
+		"tasarım sistemi"
+	],
+	"version": "0.0.0",
+	"source": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git"
+}

@@ -8,6 +8,7 @@ import { intake } from "./intake";
 import { DEFAULT_RUBRIC, judge } from "./judge";
 import { planner } from "./planner";
 import { router, UnsupportedRouteError, type Route } from "./router";
+import { matchDesignSkill } from "./skillMatching";
 import { buildBrief, spawnSubAgent } from "./subagents";
 import type { Plan, PlanStep, RunContext, TaskIntake } from "./types";
 
@@ -215,7 +216,9 @@ async function executeStep(step: PlanStep, route: Route, ctx: RunContext, testCo
 		return { stepId: step.id, ok: result.ok, notes: result.notes };
 	}
 
-	const messages: ChatMessage[] = [{ role: "user", content: step.description }];
+	const skillHint = matchDesignSkill(step, ctx.skillRegistry);
+	const stepPrompt = skillHint ? `${skillHint}\n\n${step.description}` : step.description;
+	const messages: ChatMessage[] = [{ role: "user", content: stepPrompt }];
 	const turnResult = await runModelToolTurn(messages, ctx);
 	const stepNotes = [...turnResult.notes];
 	let ok = !turnResult.blocked;

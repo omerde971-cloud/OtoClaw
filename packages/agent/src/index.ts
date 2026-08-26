@@ -6,6 +6,7 @@ export * from "./context";
 export * from "./intake";
 export * from "./planner";
 export * from "./router";
+export * from "./skillMatching";
 export * from "./codeTestDebug";
 export * from "./subagents";
 export * from "./worktree";

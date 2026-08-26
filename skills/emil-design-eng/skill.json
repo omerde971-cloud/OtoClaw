@@ -1,0 +1,25 @@
+{
+	"name": "emil-design-eng",
+	"description": "Encodes Emil Kowalski's philosophy on UI polish, component design, animation decisions, and the invisible details that make software feel great.",
+	"triggers": [
+		"ui",
+		"polish",
+		"cila",
+		"component",
+		"bileşen",
+		"animation",
+		"animasyon",
+		"transition",
+		"geçiş",
+		"interaction",
+		"etkileşim",
+		"design engineering",
+		"tasarım mühendisliği",
+		"micro-interaction",
+		"hover",
+		"feel",
+		"his"
+	],
+	"version": "0.0.0",
+	"source": "https://github.com/emilkowalski/skill.git"
+}
