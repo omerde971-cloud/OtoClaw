@@ -1,3 +1,4 @@
+import { resolveKnownServerConfig } from "./catalog";
 import { connect } from "./client";
 import type { McpClientHandle, McpServerConfig } from "./types";
 
@@ -29,6 +30,24 @@ export class McpRegistry {
 		} catch (err) {
 			return {
 				name: config.name,
+				ok: false,
+				status: "failed",
+				error: err instanceof Error ? err.message : String(err),
+			};
+		}
+	}
+
+	/** Connects a catalog entry (see catalog.ts) by name, applying `overrides` on top of it. */
+	async connectKnown(
+		name: string,
+		overrides?: Partial<Omit<McpServerConfig, "name">>,
+	): Promise<McpConnectAttempt> {
+		try {
+			const config = resolveKnownServerConfig(name, overrides);
+			return await this.connectOne(config);
+		} catch (err) {
+			return {
+				name,
 				ok: false,
 				status: "failed",
 				error: err instanceof Error ? err.message : String(err),
