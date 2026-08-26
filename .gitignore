@@ -6,3 +6,6 @@ build/
 .otoclaw/
 .DS_Store
 .claude/worktrees/
+.env
+.env.*
+!.env.example
