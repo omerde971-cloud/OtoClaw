@@ -1,5 +1,5 @@
 import { cursorOverlay } from "./cursor-overlay";
-import { dispatchClick, dispatchInput } from "./synthetic-events";
+import { dispatchClick, dispatchContentEditableInput, dispatchInput } from "./synthetic-events";
 
 const POLL_INTERVAL_MS = 100;
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -83,5 +83,27 @@ export async function typeInto(selector: string, text: string): Promise<boolean>
 	cursorOverlay.moveTo(x, y);
 	await wait(CURSOR_SETTLE_MS);
 	dispatchInput(el, text);
+	return true;
+}
+
+/**
+ * Like `typeInto`, but also accepts `contenteditable` elements (e.g. Gmail's compose body),
+ * which have no `.value` to write through.
+ */
+export async function typeIntoEditable(selector: string, text: string): Promise<boolean> {
+	const el = findElement(selector);
+	if (!el || !(el instanceof HTMLElement)) return false;
+
+	const { x, y } = centerOf(el);
+	cursorOverlay.moveTo(x, y);
+	await wait(CURSOR_SETTLE_MS);
+
+	if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+		dispatchInput(el, text);
+	} else if (el.isContentEditable || el.getAttribute("contenteditable") === "true") {
+		dispatchContentEditableInput(el, text);
+	} else {
+		return false;
+	}
 	return true;
 }
