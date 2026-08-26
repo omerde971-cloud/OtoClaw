@@ -1,3 +1,4 @@
+import { loadEnvFile } from "@otoclaw/shared";
 import { createAnthropicProvider } from "./anthropic";
 import { createCliDelegateProvider } from "./cli-delegate";
 import type { KeyStore } from "./keychain";
@@ -82,9 +83,20 @@ function splitSpec(spec: string): [string, string] {
 	return [spec.slice(0, slashIndex), spec.slice(slashIndex + 1)];
 }
 
+/** Maps a provider id (e.g. "lm-studio") to its `.env` key name (e.g. "LM_STUDIO"). */
+function envKeyName(providerId: string): string {
+	return providerId.toUpperCase().replace(/-/g, "_");
+}
+
+export interface ResolveOptions {
+	/** Overrides where the `.env` file is read from — used by tests so they never touch the real project `.env`. */
+	envPath?: string;
+}
+
 export async function resolve(
 	spec: string,
 	keyStore: KeyStore,
+	options: ResolveOptions = {},
 ): Promise<ResolvedProvider> {
 	const [providerId, model] = splitSpec(spec);
 	const config = PROVIDER_CONFIGS[providerId];
@@ -92,7 +104,12 @@ export async function resolve(
 		throw new UnknownProviderError(providerId);
 	}
 
-	const apiKey = await keyStore.get(providerId);
+	// `.env` (project root, "PROVIDER: key" lines) takes priority over the OS keychain so
+	// a plain-text .env — if the user opts into one — always wins; the keychain remains the
+	// fallback for anyone still using `provider.addKey` / the setup wizard.
+	const envVars = loadEnvFile(options.envPath);
+	const envKey = envVars[envKeyName(providerId)];
+	const apiKey = envKey && envKey.length > 0 ? envKey : await keyStore.get(providerId);
 	if (config.requiresKey && !apiKey) {
 		throw new MissingApiKeyError(providerId);
 	}

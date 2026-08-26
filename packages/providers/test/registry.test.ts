@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, test } from "bun:test";
 import { MemoryKeyStore } from "../src/keychain-memory";
 import {
 	MissingApiKeyError,
@@ -64,5 +67,67 @@ describe("registry.resolve", () => {
 		expect(resolved.provider.id).toBe("codex-cli");
 		const models = await resolved.provider.listModels();
 		expect(models[0]?.provider).toBe("codex");
+	});
+});
+
+describe("registry.resolve — .env priority", () => {
+	let dir: string | undefined;
+
+	afterEach(() => {
+		if (dir && existsSync(dir)) {
+			rmSync(dir, { recursive: true, force: true });
+		}
+		dir = undefined;
+	});
+
+	function writeEnvFile(contents: string): string {
+		dir = mkdtempSync(join(tmpdir(), "otoclaw-registry-env-test-"));
+		const envPath = join(dir, ".env");
+		writeFileSync(envPath, contents);
+		return envPath;
+	}
+
+	test("prefers a key from .env over one stored in the keychain", async () => {
+		const envPath = writeEnvFile("ANTHROPIC: sk-ant-from-env\n");
+		const keyStore = new MemoryKeyStore();
+		await keyStore.set("anthropic", "sk-ant-from-keychain");
+
+		const resolved = await resolve("anthropic/claude-sonnet-4-5", keyStore, { envPath });
+		expect(resolved.apiKey).toBe("sk-ant-from-env");
+	});
+
+	test("falls back to the keychain when .env has no entry for the provider", async () => {
+		const envPath = writeEnvFile("OPENAI: sk-oai-from-env\n");
+		const keyStore = new MemoryKeyStore();
+		await keyStore.set("anthropic", "sk-ant-from-keychain");
+
+		const resolved = await resolve("anthropic/claude-sonnet-4-5", keyStore, { envPath });
+		expect(resolved.apiKey).toBe("sk-ant-from-keychain");
+	});
+
+	test("falls back to the keychain when .env is missing entirely", async () => {
+		dir = mkdtempSync(join(tmpdir(), "otoclaw-registry-env-test-"));
+		const envPath = join(dir, ".env"); // never written
+		const keyStore = new MemoryKeyStore();
+		await keyStore.set("anthropic", "sk-ant-from-keychain");
+
+		const resolved = await resolve("anthropic/claude-sonnet-4-5", keyStore, { envPath });
+		expect(resolved.apiKey).toBe("sk-ant-from-keychain");
+	});
+
+	test("an .env entry with an empty value does not shadow the keychain", async () => {
+		const envPath = writeEnvFile("ANTHROPIC:\n");
+		const keyStore = new MemoryKeyStore();
+		await keyStore.set("anthropic", "sk-ant-from-keychain");
+
+		const resolved = await resolve("anthropic/claude-sonnet-4-5", keyStore, { envPath });
+		expect(resolved.apiKey).toBe("sk-ant-from-keychain");
+	});
+
+	test("multi-word provider ids map to underscored env keys (lm-studio -> LM_STUDIO)", async () => {
+		const envPath = writeEnvFile("LM_STUDIO: sk-lm-from-env\n");
+		const keyStore = new MemoryKeyStore();
+		const resolved = await resolve("lm-studio/local-model", keyStore, { envPath });
+		expect(resolved.apiKey).toBe("sk-lm-from-env");
 	});
 });
