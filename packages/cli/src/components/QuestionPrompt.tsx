@@ -1,5 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { useState } from "react";
+import { assignShortcuts, THEME } from "../theme";
 
 export interface QuestionOption {
 	id: string;
@@ -26,9 +27,19 @@ export function QuestionPrompt({
 	onRespond,
 }: QuestionPromptProps): React.JSX.Element {
 	const items = allowFreeText ? [...options, { id: FREE_TEXT_ID, label: "Other (type your own)…" }] : options;
+	const shortcuts = assignShortcuts(items.map((i) => i.label));
 	const [index, setIndex] = useState(0);
 	const [freeTextMode, setFreeTextMode] = useState(false);
 	const [freeText, setFreeText] = useState("");
+
+	function select(i: number): void {
+		const selected = items[i];
+		if (selected.id === FREE_TEXT_ID) {
+			setFreeTextMode(true);
+			return;
+		}
+		onRespond({ optionId: selected.id });
+	}
 
 	useInput((input, key) => {
 		if (freeTextMode) {
@@ -48,19 +59,16 @@ export function QuestionPrompt({
 
 		if (key.upArrow) setIndex((i) => (i - 1 + items.length) % items.length);
 		if (key.downArrow) setIndex((i) => (i + 1) % items.length);
-		if (key.return) {
-			const selected = items[index];
-			if (selected.id === FREE_TEXT_ID) {
-				setFreeTextMode(true);
-				return;
-			}
-			onRespond({ optionId: selected.id });
-		}
+		if (key.return) select(index);
+
+		const pressed = input.toUpperCase();
+		const shortcutIndex = shortcuts.indexOf(pressed);
+		if (shortcutIndex !== -1) select(shortcutIndex);
 	});
 
 	return (
-		<Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-			<Text bold color="cyan">
+		<Box flexDirection="column" borderStyle="round" borderColor={THEME.accent} paddingX={1}>
+			<Text bold color={THEME.accent}>
 				{header}
 			</Text>
 			<Text>{question}</Text>
@@ -72,9 +80,9 @@ export function QuestionPrompt({
 				</Text>
 			) : (
 				items.map((item, i) => (
-					<Text key={item.id} color={i === index ? "cyan" : undefined}>
+					<Text key={item.id} color={i === index ? THEME.accentBright : undefined}>
 						{i === index ? "› " : "  "}
-						{item.label}
+						[{shortcuts[i]}] {item.label}
 					</Text>
 				))
 			)}

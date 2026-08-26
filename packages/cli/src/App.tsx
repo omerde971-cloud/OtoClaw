@@ -1,5 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Banner } from "./components/Banner";
 import { PermissionPrompt } from "./components/PermissionPrompt";
 import { QuestionPrompt } from "./components/QuestionPrompt";
 import { StreamingMessage } from "./components/StreamingMessage";
@@ -7,6 +8,7 @@ import { ToolEventLine } from "./components/ToolEventLine";
 import { MascotView } from "./mascot/MascotView";
 import { SetupWizard } from "./setupWizard";
 import { HELP_TEXT, parseSlashCommand } from "./slashCommands";
+import { formatClock, THEME } from "./theme";
 import type { WsClient } from "./wsClient";
 
 interface TranscriptEntry {
@@ -14,7 +16,10 @@ interface TranscriptEntry {
 	kind: "user" | "assistant" | "system" | "tool";
 	text: string;
 	ok?: boolean;
+	ts: number;
 }
+
+const RECENT_ACTIVITY_LIMIT = 3;
 
 interface PendingPermission {
 	requestId: string;
@@ -61,8 +66,8 @@ export function App({ client, cwd }: AppProps): React.JSX.Element {
 	const [inputValue, setInputValue] = useState("");
 	const sessionIdRef = useRef<string | null>(null);
 
-	const pushEntry = useCallback((entry: Omit<TranscriptEntry, "id">): void => {
-		setTranscript((t) => [...t, { ...entry, id: nextId() }]);
+	const pushEntry = useCallback((entry: Omit<TranscriptEntry, "id" | "ts">): void => {
+		setTranscript((t) => [...t, { ...entry, id: nextId(), ts: Date.now() }]);
 	}, []);
 
 	useEffect(() => {
@@ -223,17 +228,38 @@ export function App({ client, cwd }: AppProps): React.JSX.Element {
 		return <SetupWizard client={client} onComplete={() => setNeedsSetup(false)} />;
 	}
 
+	const recentActivity = transcript.filter((e) => e.kind === "tool" && e.ok !== undefined).slice(-RECENT_ACTIVITY_LIMIT);
+
 	return (
 		<Box flexDirection="column">
-			<MascotView state={mascotState} />
+			<Banner />
+			<Box marginTop={1}>
+				<MascotView state={mascotState} />
+			</Box>
 			<Box flexDirection="column" marginTop={1}>
 				{transcript.map((entry) => {
 					if (entry.kind === "tool") {
-						return <ToolEventLine key={entry.id} name={entry.text} phase={entry.ok === undefined ? "start" : "end"} ok={entry.ok} />;
+						return (
+							<ToolEventLine
+								key={entry.id}
+								name={entry.text}
+								phase={entry.ok === undefined ? "start" : "end"}
+								ok={entry.ok}
+								ts={entry.ts}
+							/>
+						);
+					}
+					if (entry.kind === "user") {
+						return (
+							<Text key={entry.id} color={THEME.accent}>
+								{"❯ "}
+								{entry.text}
+							</Text>
+						);
 					}
 					return (
 						<Text key={entry.id} dimColor={entry.kind === "system"}>
-							{entry.kind === "user" ? "> " : ""}
+							<Text color={THEME.accent}>[{formatClock(entry.ts)}] </Text>
 							{entry.text}
 						</Text>
 					);
@@ -262,10 +288,17 @@ export function App({ client, cwd }: AppProps): React.JSX.Element {
 					}}
 				/>
 			) : null}
+			{recentActivity.length > 0 ? (
+				<Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={THEME.dim} borderBottom={false} borderLeft={false} borderRight={false} paddingTop={0}>
+					{recentActivity.map((entry) => (
+						<ToolEventLine key={`recent-${entry.id}`} name={entry.text} phase="end" ok={entry.ok} ts={entry.ts} />
+					))}
+				</Box>
+			) : null}
 			{!pendingPermission && !pendingQuestion ? (
-				<Box marginTop={1}>
+				<Box marginTop={1} borderStyle="round" borderColor={THEME.accent} paddingX={1}>
+					<Text color={THEME.accent}>{"💬 "}</Text>
 					<Text dimColor>[{mode}] </Text>
-					<Text>{"> "}</Text>
 					<Text>{inputValue}</Text>
 					<Text dimColor>▍</Text>
 				</Box>

@@ -1,5 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { useState } from "react";
+import { THEME } from "./theme";
 import type { WsClient } from "./wsClient";
 
 /** Mirrors packages/providers/src/registry.ts's known provider ids. */
@@ -84,10 +85,10 @@ export function SetupWizard({ client, onComplete }: SetupWizardProps): React.JSX
 
 	if (step === "provider") {
 		return (
-			<Box flexDirection="column" borderStyle="round" paddingX={1}>
+			<Box flexDirection="column" borderStyle="round" borderColor={THEME.accent} paddingX={1}>
 				<Text bold>Choose a provider</Text>
 				{PROVIDERS.map((p, i) => (
-					<Text key={p} color={i === providerIndex ? "cyan" : undefined}>
+					<Text key={p} color={i === providerIndex ? THEME.accentBright : undefined}>
 						{i === providerIndex ? "› " : "  "}
 						{p}
 					</Text>
@@ -98,7 +99,7 @@ export function SetupWizard({ client, onComplete }: SetupWizardProps): React.JSX
 
 	if (step === "key") {
 		return (
-			<Box flexDirection="column" borderStyle="round" paddingX={1}>
+			<Box flexDirection="column" borderStyle="round" borderColor={THEME.accent} paddingX={1}>
 				<Text bold>API key for {provider}</Text>
 				<Text dimColor>(leave empty and press Enter to skip, e.g. for local providers)</Text>
 				<Text>
@@ -111,7 +112,7 @@ export function SetupWizard({ client, onComplete }: SetupWizardProps): React.JSX
 
 	if (step === "model") {
 		return (
-			<Box flexDirection="column" borderStyle="round" paddingX={1}>
+			<Box flexDirection="column" borderStyle="round" borderColor={THEME.accent} paddingX={1}>
 				<Text bold>Default model for {provider} (model id only, not "provider/model")</Text>
 				<Text>
 					{"> "}
@@ -123,10 +124,10 @@ export function SetupWizard({ client, onComplete }: SetupWizardProps): React.JSX
 
 	if (step === "mode") {
 		return (
-			<Box flexDirection="column" borderStyle="round" paddingX={1}>
+			<Box flexDirection="column" borderStyle="round" borderColor={THEME.accent} paddingX={1}>
 				<Text bold>Default mode</Text>
 				{modes.map((m, i) => (
-					<Text key={m} color={i === modeIndex ? "cyan" : undefined}>
+					<Text key={m} color={i === modeIndex ? THEME.accentBright : undefined}>
 						{i === modeIndex ? "› " : "  "}
 						{m}
 					</Text>

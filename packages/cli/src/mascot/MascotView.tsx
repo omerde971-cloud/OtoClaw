@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
+import { THEME } from "../theme";
 import { CODING_FRAMES, IDLE_FRAMES, THINKING_FRAMES } from "./frames";
 import { type RenderedMascotState, toRenderedState } from "./MascotState";
 
@@ -30,7 +31,7 @@ export function MascotView({ state }: MascotViewProps): React.JSX.Element {
 	}, [frames]);
 
 	return (
-		<Box flexDirection="column" borderStyle="round" paddingX={1}>
+		<Box flexDirection="column" borderStyle="round" borderColor={THEME.accent} paddingX={1}>
 			<Text>{frames[frameIndex % frames.length]}</Text>
 			<Text dimColor>{rendered}</Text>
 		</Box>
