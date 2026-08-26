@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { render } from "ink";
 import { createElement } from "react";
 import { App } from "./App";
@@ -53,9 +53,32 @@ async function waitForDaemon(timeoutMs = 5000): Promise<DaemonInfo> {
 	throw new Error("otoclaw daemon did not start in time");
 }
 
+/**
+ * Dev mode (`bun run packages/cli/src/index.tsx`) has the daemon's TS source
+ * on disk next to this file, so `bun run` on it works directly. A `bun build
+ * --compile` binary has no source files embedded on disk — only the sibling
+ * `otoclaw-daemon` binary (built by scripts/build-binary.ts) that this branch
+ * spawns instead.
+ */
 function spawnDaemon(): void {
 	const daemonEntry = join(import.meta.dir, "..", "..", "daemon", "src", "main.ts");
-	Bun.spawn(["bun", "run", daemonEntry], {
+	if (existsSync(daemonEntry)) {
+		Bun.spawn(["bun", "run", daemonEntry], {
+			stdout: "ignore",
+			stderr: "ignore",
+			stdin: "ignore",
+		});
+		return;
+	}
+
+	const exeSuffix = process.platform === "win32" ? ".exe" : "";
+	const siblingDaemon = join(dirname(process.execPath), `otoclaw-daemon${exeSuffix}`);
+	if (!existsSync(siblingDaemon)) {
+		throw new Error(
+			`could not find the otoclaw daemon: no source at ${daemonEntry} and no sibling binary at ${siblingDaemon}`,
+		);
+	}
+	Bun.spawn([siblingDaemon], {
 		stdout: "ignore",
 		stderr: "ignore",
 		stdin: "ignore",
