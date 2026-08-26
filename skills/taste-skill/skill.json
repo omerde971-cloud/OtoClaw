@@ -1,0 +1,25 @@
+{
+	"name": "taste-skill",
+	"description": "Anti-slop frontend skill for landing pages, portfolios, and redesigns. Reads the brief, infers the right design direction, and ships interfaces that do not look templated. Real design systems when applicable, audit-first on redesigns, strict pre-flight check.",
+	"triggers": [
+		"tasarım",
+		"ui",
+		"ux",
+		"taste",
+		"zevk",
+		"görsel kalite",
+		"landing page",
+		"frontend",
+		"redesign",
+		"portfolio",
+		"design system",
+		"tailwind",
+		"typography",
+		"tipografi",
+		"renk paleti",
+		"layout",
+		"hero section"
+	],
+	"version": "0.0.0",
+	"source": "https://github.com/Leonxlnx/taste-skill.git"
+}
