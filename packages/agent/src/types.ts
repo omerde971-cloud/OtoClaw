@@ -1,4 +1,4 @@
-import type { Config, PipelineStage, Policy, Session } from "@otoclaw/shared";
+import type { Config, PipelineStage, Policy, Session, Verdict } from "@otoclaw/shared";
 import type { PermissionEngine, RiskScore, SessionOverrides } from "@otoclaw/permission";
 import type { Provider } from "@otoclaw/providers";
 import type { ToolContext, ToolRegistry, ToolResult } from "@otoclaw/tools";
@@ -101,6 +101,7 @@ export interface AgentEventMap {
 		status: string;
 		result: SubAgentResult | null;
 	};
+	"judge.verdict": Verdict;
 	error: { code: string; message: string; recoverable: boolean };
 }
 

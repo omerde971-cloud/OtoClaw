@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import type { ChatMessage } from "@otoclaw/providers";
 import type { PermissionCheckInput, PermissionDecision } from "@otoclaw/permission";
+import type { Verdict } from "@otoclaw/shared";
 import type { AgentEvents } from "./types";
 import { codeTestDebug } from "./codeTestDebug";
 import { intake } from "./intake";
+import { DEFAULT_RUBRIC, judge } from "./judge";
 import { planner } from "./planner";
 import { router, UnsupportedRouteError, type Route } from "./router";
 import { buildBrief, spawnSubAgent } from "./subagents";
@@ -202,6 +205,7 @@ export interface RunTaskResult {
 	plan: Plan;
 	stepResults: StepResult[];
 	review: ReviewResult;
+	verdicts: Verdict[];
 }
 
 async function executeStep(step: PlanStep, route: Route, ctx: RunContext, testCommand: string): Promise<StepResult> {
@@ -225,6 +229,64 @@ async function executeStep(step: PlanStep, route: Route, ctx: RunContext, testCo
 	return { stepId: step.id, ok, notes: stepNotes };
 }
 
+/** Repair loop never repairs more than this many times before falling back to a question. */
+const MAX_REPAIR_ATTEMPTS = 2;
+
+/** A fix turn that folds the judge's notes into a follow-up prompt, mirroring codeTestDebug's fix-turn pattern. */
+async function runRepair(step: PlanStep, notes: string[], ctx: RunContext): Promise<void> {
+	const fixMessages: ChatMessage[] = [
+		{
+			role: "user",
+			content: `The output for step "${step.description}" did not meet quality expectations:\n${notes.join("\n") || "(no notes)"}\n\nImprove it.`,
+		},
+	];
+	await runModelToolTurn(fixMessages, ctx);
+}
+
+export interface StepJudgeOutcome {
+	verdicts: Verdict[];
+	accepted: boolean;
+}
+
+/**
+ * Judges a step's output; on a "bad" verdict, repairs and re-judges up to MAX_REPAIR_ATTEMPTS
+ * times. If it's still "bad" after the cap, asks the user via a button question rather than
+ * silently accepting or looping forever ("Elle düzelt" is offered but not wired to an action yet).
+ */
+export async function judgeAndRepair(step: PlanStep, ctx: RunContext): Promise<StepJudgeOutcome> {
+	const verdicts: Verdict[] = [];
+
+	for (let attempt = 0; ; attempt++) {
+		const verdict = await judge({
+			artifact: { kind: step.kind === "code" ? "code" : "text", description: step.description, ref: step.id },
+			rubric: DEFAULT_RUBRIC,
+			ctx,
+		});
+		verdicts.push(verdict);
+		ctx.events.emit("judge.verdict", verdict);
+
+		if (verdict.label === "good") {
+			return { verdicts, accepted: true };
+		}
+
+		if (attempt >= MAX_REPAIR_ATTEMPTS) {
+			const answer = await ctx.questionChannel.ask({
+				questionId: randomUUID(),
+				header: "Kalite onayı",
+				question: "Bu çıktı beklenen kaliteye ulaşmadı, ne yapayım?",
+				options: [
+					{ id: "accept", label: "Kabul et" },
+					{ id: "cancel", label: "İptal" },
+					{ id: "manual", label: "Elle düzelt" },
+				],
+			});
+			return { verdicts, accepted: answer.optionId !== "cancel" };
+		}
+
+		await runRepair(step, verdict.notes, ctx);
+	}
+}
+
 /**
  * Implements ARCHITECTURE.md §6's runTask pseudocode: intake -> plan -> route -> execute each
  * step -> review -> deliver. Emits `pipeline.stage` at each transition.
@@ -239,6 +301,7 @@ export async function runTask(ctx: RunContext, input: RunTaskInput): Promise<Run
 	const plan = await planner(taskIntake, ctx.provider, ctx.model, ctx.signal);
 
 	const stepResults: StepResult[] = [];
+	const verdicts: Verdict[] = [];
 
 	for (const step of plan.steps) {
 		ctx.events.emit("pipeline.stage", { stage: "route" });
@@ -255,6 +318,16 @@ export async function runTask(ctx: RunContext, input: RunTaskInput): Promise<Run
 
 		ctx.events.emit("pipeline.stage", { stage: "execute" });
 		const result = await executeStep(step, route, ctx, testCommand);
+
+		if (result.ok) {
+			const outcome = await judgeAndRepair(step, ctx);
+			verdicts.push(...outcome.verdicts);
+			if (!outcome.accepted) {
+				result.ok = false;
+				result.notes.push("judge rejected the output and the user chose to cancel");
+			}
+		}
+
 		stepResults.push(result);
 	}
 
@@ -266,5 +339,5 @@ export async function runTask(ctx: RunContext, input: RunTaskInput): Promise<Run
 
 	ctx.events.emit("pipeline.stage", { stage: "deliver" });
 
-	return { intake: taskIntake, plan, stepResults, review };
+	return { intake: taskIntake, plan, stepResults, review, verdicts };
 }

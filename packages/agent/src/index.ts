@@ -9,4 +9,5 @@ export * from "./router";
 export * from "./codeTestDebug";
 export * from "./subagents";
 export * from "./worktree";
+export * from "./judge";
 export * from "./loop";
