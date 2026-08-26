@@ -12,6 +12,65 @@ OS keychain, never in a config file.
 Full engineering spec: [`ARCHITECTURE.md`](ARCHITECTURE.md). Project pillars and
 roadmap: [`OTOCLAW_PLAN.md`](OTOCLAW_PLAN.md).
 
+## Screenshots
+
+All three below are real, captured pixels from OtoClaw's own code during
+development — not mockups. Terminal: the real `App.tsx` rendered headlessly
+through Ink's own renderer. Desktop app: a genuine Flutter golden-file
+capture of `MascotWidget`. Website: a real headless-Chromium screenshot of
+`apps/website`.
+
+| Terminal | Native desktop app | Website |
+| --- | --- | --- |
+| [![Terminal](docs/screenshots/terminal.png)](docs/screenshots/terminal.png) | [![Desktop app mascot](docs/screenshots/desktop-app-mascot.png)](docs/screenshots/desktop-app-mascot.png) | [![Website](docs/screenshots/website.png)](docs/screenshots/website.png) |
+
+## How OtoClaw compares
+
+The most visible project in this space today is
+[**OpenClaw**](https://github.com/openclaw) (formerly Clawdbot/Moltbot) — a
+messaging-first, MIT-licensed agent with 68K–196K+ GitHub stars, 50,000+
+active users, 10+ chat-platform integrations (WhatsApp, Telegram, Discord,
+Slack, Signal, iMessage…), and a 100+ skill marketplace. It has real,
+large-scale adoption OtoClaw does not have yet — that's the honest starting
+point.
+
+Its own security research is also public and consistent: multiple published
+analyses (SMU, NordLayer, Barracuda, IBM X-Force, arXiv papers on OpenClaw
+agent security) describe prompt-injection exposure, no reliable way to tell a
+legitimate command from an instruction hidden in ingested content, and
+excessive default permissions — serious enough that some institutions have
+banned it on managed devices.
+
+| | OtoClaw | OpenClaw |
+| --- | --- | --- |
+| Adoption | New, 0 real users yet | 50,000+ active users, 68K–196K★ |
+| Channels | Terminal, native desktop app, browser bridge | 10+ chat platforms (WhatsApp, Telegram, Discord, Slack…) |
+| Skill marketplace | 3 bundled design skills, auto-selected per task | 100+ community skills |
+| Auto-mode sandbox | **Hard invariant** — `sandboxRequired:true` cannot be disabled via config, enforced and tested in the permission engine | Reported as a known weak point (excessive permissions, prompt injection) in independent security research |
+| 3rd-party install | Approval-gated + quarantined before install (skills, MCP servers) | Community skill install, less structural gating reported |
+| Sub-agent isolation | Git-worktree isolated, budget/concurrency capped | Not a documented architectural feature |
+| License | Apache-2.0 | MIT |
+
+**Where OtoClaw would need to grow to actually compete:** it has zero of
+OpenClaw's network effects today. To close that gap it would need (1) chat-
+platform bridges — OpenClaw's whole distribution engine — which OtoClaw does
+not have at all yet, (2) a real public skill marketplace instead of 3 bundled
+skills, (3) actual field usage (real API keys, real users, real incidents to
+learn from — this build has none of that yet), and (4) a marketing story that
+leads with the one place the research says OpenClaw is genuinely weak:
+sandboxing and install-time approval. Security-by-architecture is a real,
+defensible angle — but only once there's a userbase large enough for anyone
+to compare against.
+
+**Benchmarks:** no live, comparative performance benchmark has been run
+against OpenClaw or anything else — that would require a real deployment with
+real traffic, which this build has not had. What does exist, honestly: 249
+automated tests (0 failing) across 15 workspace packages, each merge
+independently re-verified by a separate Tester pass rather than trusting a
+single agent's self-report. That's a signal about code correctness, not
+about real-world throughput, latency, or user-facing quality — those numbers
+don't exist yet and this README won't invent them.
+
 ## Pillars
 
 1. **Multi-model brain** — OpenRouter, Anthropic, OpenAI, Google Gemini, NVIDIA
@@ -44,8 +103,14 @@ doing:
 
 ```sh
 bun install
+cp .env.example .env   # fill in your own provider API key(s) + MODEL
 bun run dev
 ```
+
+Provider credentials live in a local `.env` (never committed —
+see [`.env.example`](.env.example)): one line per provider, `NAME: value`.
+`.env` is checked before the OS keychain, so this is the fastest way to get a
+model wired up; the keychain remains the fallback for anyone who prefers it.
 
 This is a [Bun workspaces](https://bun.sh/docs/install/workspaces) monorepo
 (`packages/*`, `apps/*`). `bun run dev` starts the daemon
