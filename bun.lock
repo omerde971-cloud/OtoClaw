@@ -64,6 +64,13 @@
         "@otoclaw/vision": "workspace:*",
       },
     },
+    "packages/google": {
+      "name": "@otoclaw/google",
+      "version": "0.0.0",
+      "dependencies": {
+        "@otoclaw/shared": "workspace:*",
+      },
+    },
     "packages/mcp": {
       "name": "@otoclaw/mcp",
       "version": "0.0.0",
@@ -186,6 +193,8 @@
     "@otoclaw/extension": ["@otoclaw/extension@workspace:apps/extension"],
 
     "@otoclaw/extension-native-host": ["@otoclaw/extension-native-host@workspace:apps/extension/native-host"],
+
+    "@otoclaw/google": ["@otoclaw/google@workspace:packages/google"],
 
     "@otoclaw/mcp": ["@otoclaw/mcp@workspace:packages/mcp"],
 
