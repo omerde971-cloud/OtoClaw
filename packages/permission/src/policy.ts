@@ -9,6 +9,7 @@ const POLICY_FIELD_BY_PERMISSION_KEY: Partial<Record<string, keyof Policy>> = {
 	"web.fetch": "web.fetch",
 	browser: "browser",
 	vision: "vision",
+	github: "github",
 };
 
 export interface ResolvePolicyInput {
