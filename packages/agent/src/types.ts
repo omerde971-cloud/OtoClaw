@@ -114,6 +114,14 @@ export interface AgentEvents {
 	off<K extends AgentEventName>(event: K, listener: (payload: AgentEventMap[K]) => void): void;
 }
 
+/**
+ * Structural handle for @otoclaw/skills' SkillRegistry — kept local to avoid a circular
+ * package dependency (skills depends on agent for QuestionChannel).
+ */
+export interface SkillRegistryHandle {
+	match(taskText: string): Array<{ manifest: { name: string; description: string } }>;
+}
+
 export interface RunContext {
 	session: Session;
 	provider: Provider;
@@ -131,4 +139,6 @@ export interface RunContext {
 	signal?: AbortSignal;
 	/** Shared concurrency-cap semaphore for sub-agent spawns within this run (ARCHITECTURE.md §9). */
 	subAgentPool?: Semaphore;
+	/** Phase 2c: optional skill registry handle. No forced integration into the loop yet. */
+	skillRegistry?: SkillRegistryHandle;
 }

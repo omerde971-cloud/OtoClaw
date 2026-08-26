@@ -1,0 +1,7 @@
+{
+	"name": "git-workflow",
+	"description": "Guidance for git branching, commits, and PR hygiene.",
+	"triggers": ["git", "commit", "pull request", "branch"],
+	"version": "0.1.0",
+	"source": "local"
+}

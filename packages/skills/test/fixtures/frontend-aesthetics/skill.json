@@ -1,0 +1,7 @@
+{
+	"name": "frontend-aesthetics",
+	"description": "Design and polish frontend UI for visual quality and taste.",
+	"triggers": ["frontend", "ui design", "landing page", "polish the ui"],
+	"version": "0.1.0",
+	"source": "local"
+}
