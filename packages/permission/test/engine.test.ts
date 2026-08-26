@@ -11,7 +11,7 @@ test("manual mode always returns ask, regardless of policy", () => {
 		cmd: "npm install",
 		mode: "manual",
 		toolDefault: "ask",
-		projectPolicy: { shell: "allow", "shell.allow": ["npm *"], "shell.deny": [], "fs.write": "allow", "web.fetch": "allow", browser: "ask", vision: "ask" },
+		projectPolicy: { shell: "allow", "shell.allow": ["npm *"], "shell.deny": [], "fs.write": "allow", "web.fetch": "allow", browser: "ask", vision: "ask", github: "ask" },
 	});
 	expect(result.decision).toBe("ask");
 	expect(result.escalate).toBe(false);
@@ -26,6 +26,7 @@ test("auto mode + dangerous command always escalates, even when shell.allow woul
 		"web.fetch": "allow",
 		browser: "ask",
 		vision: "ask",
+		github: "ask",
 	};
 	const result = engine.check({
 		toolName: "shell.run",
@@ -61,6 +62,7 @@ test("auto mode + shell.allow match for a safe command allows silently", () => {
 		"web.fetch": "ask",
 		browser: "ask",
 		vision: "ask",
+		github: "ask",
 	};
 	const result = engine.check({
 		toolName: "shell.run",
@@ -84,6 +86,7 @@ test("auto mode + shell.deny match blocks without escalating a button question",
 		"web.fetch": "ask",
 		browser: "ask",
 		vision: "ask",
+		github: "ask",
 	};
 	const result = engine.check({
 		toolName: "shell.run",
@@ -140,6 +143,18 @@ test("auto mode + vision permission key with no policy override defaults to ask 
 	});
 	expect(result.decision).toBe("ask");
 	expect(result.risk.score).toBe(15);
+	expect(result.sandboxRequired).toBe(true);
+});
+
+test("auto mode + github permission key with no policy override defaults to ask (base risk 30)", () => {
+	const result = engine.check({
+		toolName: "github",
+		permissionKey: "github",
+		mode: "auto",
+		toolDefault: "ask",
+	});
+	expect(result.decision).toBe("ask");
+	expect(result.risk.score).toBe(30);
 	expect(result.sandboxRequired).toBe(true);
 });
 

@@ -22,6 +22,7 @@ export const PolicySchema = z.object({
 	"web.fetch": PermissionDecisionValueSchema.default("ask"),
 	browser: PermissionDecisionValueSchema.default("ask"),
 	vision: PermissionDecisionValueSchema.default("ask"),
+	github: PermissionDecisionValueSchema.default("ask"),
 });
 
 export type Policy = z.infer<typeof PolicySchema>;

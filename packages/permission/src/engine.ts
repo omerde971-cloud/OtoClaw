@@ -11,6 +11,7 @@ const BASE_RISK_BY_PERMISSION_KEY: Record<string, number> = {
 	mcp: 40,
 	browser: 45,
 	vision: 15,
+	github: 30,
 };
 
 function baseRisk(permissionKey: string): number {

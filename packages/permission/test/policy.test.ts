@@ -10,6 +10,7 @@ const projectPolicy: Policy = {
 	"web.fetch": "deny",
 	browser: "ask",
 	vision: "ask",
+	github: "ask",
 };
 
 const globalConfig: Config = {
@@ -84,6 +85,24 @@ test("vision falls back to global config when no project policy is present", () 
 		permissionKey: "vision",
 		toolDefault: "ask",
 		globalConfig: { ...globalConfig, permissions: { ...globalConfig.permissions, vision: "deny" } },
+	});
+	expect(result).toEqual({ decision: "deny", source: "global-config" });
+});
+
+test("project github policy overrides tool default", () => {
+	const result = resolvePolicy({
+		permissionKey: "github",
+		toolDefault: "ask",
+		projectPolicy: { ...projectPolicy, github: "allow" },
+	});
+	expect(result).toEqual({ decision: "allow", source: "project-policy" });
+});
+
+test("github falls back to global config when no project policy is present", () => {
+	const result = resolvePolicy({
+		permissionKey: "github",
+		toolDefault: "ask",
+		globalConfig: { ...globalConfig, permissions: { ...globalConfig.permissions, github: "deny" } },
 	});
 	expect(result).toEqual({ decision: "deny", source: "global-config" });
 });
