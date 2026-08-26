@@ -8,6 +8,7 @@ const BASE_RISK_BY_PERMISSION_KEY: Record<string, number> = {
 	"fs.write": 30,
 	shell: 50,
 	"web.fetch": 20,
+	mcp: 40,
 };
 
 function baseRisk(permissionKey: string): number {

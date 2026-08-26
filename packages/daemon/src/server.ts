@@ -7,6 +7,7 @@ import {
 	NodeAgentEvents,
 	runTask,
 } from "@otoclaw/agent";
+import { McpRegistry } from "@otoclaw/mcp";
 import { PermissionEngine, type SessionOverrides } from "@otoclaw/permission";
 import {
 	KNOWN_PROVIDER_IDS,
@@ -25,6 +26,9 @@ import {
 	type JsonRpcRequest,
 	type JsonRpcResponse,
 	type MascotStatePayload,
+	type McpConnectParams,
+	type McpListResult,
+	type McpServerInfo,
 	type MessageSendParams,
 	type ModeSetParams,
 	type ModelInfo,
@@ -36,7 +40,7 @@ import {
 	type QuestionRespondParams,
 	type RunCancelParams,
 } from "@otoclaw/shared";
-import { defaultToolRegistry } from "@otoclaw/tools";
+import { defaultToolRegistry, registerMcpTools } from "@otoclaw/tools";
 import { DaemonPermissionChannel, DaemonQuestionChannel, type PendingPermission, type PendingQuestion } from "./channels";
 import { loadConfig, saveConfig } from "./config";
 import { stageMascotState, toolMascotState } from "./mascot";
@@ -80,6 +84,40 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 	const pendingQuestions = new Map<string, PendingQuestion>();
 	const runAbortControllers = new Map<string, AbortController>();
 	const lastCost = new Map<string, { tokensIn: number; tokensOut: number; usd: number }>();
+	const mcpRegistry = new McpRegistry();
+
+	function broadcastMcpStatus(name: string, status: string, error?: string): void {
+		broadcast({ jsonrpc: "2.0", method: "mcp.status", params: { name, status, error } });
+	}
+
+	/**
+	 * Best-effort: a configured MCP server that fails to connect (missing binary, crash, etc.)
+	 * is logged and reported via mcp.status, never allowed to bring the daemon down.
+	 */
+	async function connectConfiguredMcpServers(): Promise<void> {
+		const config = loadConfig();
+		for (const serverConfig of config.mcpServers) {
+			const attempt = await mcpRegistry.connectOne(serverConfig);
+			broadcastMcpStatus(attempt.name, attempt.status, attempt.error);
+			if (!attempt.ok) {
+				console.error(`[mcp] failed to connect "${attempt.name}": ${attempt.error}`);
+				continue;
+			}
+			const handle = mcpRegistry.get(attempt.name);
+			if (!handle) continue;
+			try {
+				await registerMcpTools(defaultToolRegistry, [
+					{
+						name: handle.config.name,
+						listTools: () => handle.listTools(),
+						callTool: (toolName, args) => handle.callTool(toolName, args),
+					},
+				]);
+			} catch (err) {
+				console.error(`[mcp] failed to register tools for "${attempt.name}": ${err instanceof Error ? err.message : String(err)}`);
+			}
+		}
+	}
 
 	function broadcast<TMethod extends string, TParams>(notification: JsonRpcNotification<TMethod, TParams>): void {
 		const raw = JSON.stringify(notification);
@@ -365,6 +403,30 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 				void keyStore.set(params.provider, params.key).then(() => reply(ws, request.id, { ok: true }));
 				return;
 			}
+			case "mcp.list": {
+				const result: McpListResult = mcpRegistry.list().map(
+					(handle): McpServerInfo => ({
+						name: handle.config.name,
+						transport: handle.config.transport,
+						status: handle.status,
+					}),
+				);
+				reply(ws, request.id, result);
+				return;
+			}
+			case "mcp.connect": {
+				const params = request.params as McpConnectParams;
+				const serverConfig = loadConfig().mcpServers.find((s) => s.name === params.name);
+				if (!serverConfig) {
+					replyError(ws, request.id, `unknown mcp server "${params.name}"`, -32602);
+					return;
+				}
+				void mcpRegistry.connectOne(serverConfig).then((attempt) => {
+					broadcastMcpStatus(attempt.name, attempt.status, attempt.error);
+					reply(ws, request.id, { ok: attempt.ok, status: attempt.status, error: attempt.error });
+				});
+				return;
+			}
 			default: {
 				replyError(ws, request.id, "Method not found", -32601);
 			}
@@ -386,12 +448,16 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 		// no-op on platforms (e.g. Windows) that don't support POSIX permissions
 	}
 
+	// Fire-and-forget: connecting configured MCP servers must never block/fail daemon startup.
+	void connectConfiguredMcpServers();
+
 	return {
 		server,
 		port: server.port ?? 0,
 		token,
 		stop: () => {
 			server.stop(true);
+			void mcpRegistry.disconnectAll();
 			const daemonJson = join(otoclawDir(), "daemon.json");
 			if (existsSync(daemonJson)) {
 				rmSync(daemonJson);
