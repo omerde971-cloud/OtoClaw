@@ -24,6 +24,7 @@ import {
 	type JsonRpcNotification,
 	type JsonRpcRequest,
 	type JsonRpcResponse,
+	type JudgeVerdictPayload,
 	type MascotStatePayload,
 	type MessageSendParams,
 	type ModeSetParams,
@@ -40,7 +41,7 @@ import { defaultToolRegistry } from "@otoclaw/tools";
 import { DaemonPermissionChannel, DaemonQuestionChannel, type PendingPermission, type PendingQuestion } from "./channels";
 import { loadConfig, saveConfig } from "./config";
 import { stageMascotState, toolMascotState } from "./mascot";
-import { createSession, getSession, otoclawDir } from "./store";
+import { createSession, getSession, otoclawDir, saveVerdict } from "./store";
 
 interface WsData {
 	authenticated: true;
@@ -120,6 +121,17 @@ export function startServer(db: Database, options: StartServerOptions = {}): Dae
 		});
 		events.on("permission.request", () => {
 			sendMascot(sessionId, "waiting");
+		});
+		events.on("judge.verdict", (verdict) => {
+			saveVerdict(db, sessionId, verdict);
+			const params: JudgeVerdictPayload = {
+				sessionId,
+				target: verdict.targetId,
+				score: verdict.score,
+				label: verdict.label,
+				notes: verdict.notes,
+			};
+			broadcast({ jsonrpc: "2.0", method: "judge.verdict", params });
 		});
 		events.on("error", (payload) => {
 			const params: ErrorEventPayload = { sessionId, ...payload };

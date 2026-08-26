@@ -67,7 +67,7 @@ export type EchoNotification = JsonRpcNotification<"echo", EchoEventPayload>;
 // ---------------------------------------------------------------------------
 // Phase 1d: message/run/permission/question/model/config wire types.
 // See ARCHITECTURE.md §3.2/§3.3. Deliberately excludes skill.*, subagent.*,
-// judge.verdict, mcp.* — those are Phase 2+.
+// mcp.* — those are Phase 2+. judge.verdict was added in Phase 2b.
 // ---------------------------------------------------------------------------
 
 export interface MessageSendParams {
@@ -216,6 +216,14 @@ export interface ErrorEventPayload {
 	recoverable: boolean;
 }
 
+export interface JudgeVerdictPayload {
+	sessionId: string;
+	target: string;
+	score: number;
+	label: "good" | "bad";
+	notes: string[];
+}
+
 export type StreamDeltaNotification = JsonRpcNotification<"stream.delta", StreamDeltaPayload>;
 export type PipelineStageNotification = JsonRpcNotification<"pipeline.stage", PipelineStagePayload>;
 export type ToolStartNotification = JsonRpcNotification<"tool.start", ToolStartPayload>;
@@ -225,3 +233,4 @@ export type QuestionAskNotification = JsonRpcNotification<"question.ask", Questi
 export type MascotStateNotification = JsonRpcNotification<"mascot.state", MascotStatePayload>;
 export type CostUpdateNotification = JsonRpcNotification<"cost.update", CostUpdatePayload>;
 export type ErrorNotification = JsonRpcNotification<"error", ErrorEventPayload>;
+export type JudgeVerdictNotification = JsonRpcNotification<"judge.verdict", JudgeVerdictPayload>;

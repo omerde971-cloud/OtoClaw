@@ -38,7 +38,6 @@ export interface ToolCall {
 	createdAt: string;
 }
 
-// TODO: Phase 2 — judge verdict record (score, label, notes)
 export interface Verdict {
 	id: string;
 	targetId: string;
