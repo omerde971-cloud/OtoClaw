@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Session, Verdict } from "@otoclaw/shared";
+import type { Session, TaskStatus, Verdict } from "@otoclaw/shared";
 
 export function otoclawDir(): string {
 	return join(homedir(), ".otoclaw");
@@ -32,6 +32,17 @@ export function openStore(
       score REAL NOT NULL,
       notes TEXT NOT NULL,
       created_at TEXT NOT NULL
+    )
+  `);
+	// One row per session, overwritten by every message.send run — the "submit and forget"
+	// flow needs only the latest run's outcome, not a full history, so this is a status
+	// cache (running/done/failed + a human-readable summary) rather than a log table.
+	db.run(`
+    CREATE TABLE IF NOT EXISTS task_results (
+      session_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     )
   `);
 	return db;
@@ -79,4 +90,29 @@ export function listVerdicts(db: Database, sessionId: string): Verdict[] {
 		)
 		.all(sessionId) as Array<{ id: string; targetId: string; label: "good" | "bad"; score: number; notes: string; createdAt: string }>;
 	return rows.map((row) => ({ ...row, notes: JSON.parse(row.notes) as string[] }));
+}
+
+export interface TaskResultRow {
+	sessionId: string;
+	status: TaskStatus;
+	summary: string;
+	updatedAt: string;
+}
+
+/** Called at the start (status "running") and end ("done"/"failed") of every message.send run. */
+export function saveTaskStatus(db: Database, sessionId: string, status: TaskStatus, summary: string): void {
+	db.run(
+		`INSERT INTO task_results (session_id, status, summary, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(session_id) DO UPDATE SET status = excluded.status, summary = excluded.summary, updated_at = excluded.updated_at`,
+		[sessionId, status, summary, new Date().toISOString()],
+	);
+}
+
+export function getTaskStatus(db: Database, sessionId: string): TaskResultRow | null {
+	const row = db
+		.query(
+			"SELECT session_id AS sessionId, status, summary, updated_at AS updatedAt FROM task_results WHERE session_id = ?",
+		)
+		.get(sessionId) as TaskResultRow | null;
+	return row ?? null;
 }
