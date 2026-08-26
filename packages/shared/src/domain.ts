@@ -13,20 +13,37 @@ export interface Message {
 	createdAt: string;
 }
 
-// TODO: Phase 1 — full Task lifecycle (pipeline stages, status, owner)
+export type PipelineStage = "intake" | "plan" | "route" | "execute" | "review" | "deliver";
+
+export type TaskStatus = "pending" | "running" | "blocked" | "done" | "failed";
+
 export interface Task {
 	id: string;
 	sessionId: string;
+	userText: string;
+	stage: PipelineStage;
+	status: TaskStatus;
+	createdAt: string;
+	updatedAt: string;
 }
 
-// TODO: Phase 1 — tool invocation record (name, args, result, risk)
 export interface ToolCall {
 	id: string;
 	sessionId: string;
+	taskId?: string;
+	name: string;
+	args: unknown;
+	result?: { ok: boolean; value?: unknown; error?: string };
+	risk?: { score: number; reasons: string[] };
+	createdAt: string;
 }
 
 // TODO: Phase 2 — judge verdict record (score, label, notes)
 export interface Verdict {
 	id: string;
 	targetId: string;
+	score: number;
+	label: "good" | "bad";
+	notes: string[];
+	createdAt: string;
 }

@@ -14,7 +14,10 @@
       "name": "@otoclaw/agent",
       "version": "0.0.0",
       "dependencies": {
+        "@otoclaw/permission": "workspace:*",
+        "@otoclaw/providers": "workspace:*",
         "@otoclaw/shared": "workspace:*",
+        "@otoclaw/tools": "workspace:*",
       },
     },
     "packages/cli": {
