@@ -1,13 +1,23 @@
 {
 	"name": "@otoclaw/cli",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"private": true,
 	"type": "module",
 	"main": "src/index.tsx",
+	"bin": {
+		"otoclaw": "./dist/otoclaw"
+	},
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"dependencies": {
 		"@otoclaw/shared": "workspace:*",
 		"ink": "^5.0.1",
-		"react": "^18.3.1"
+		"react": "^18.3.1",
+		"react-devtools-core": "^5.0.0"
 	},
 	"devDependencies": {
 		"@types/react": "^18.3.3",
