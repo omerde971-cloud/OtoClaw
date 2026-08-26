@@ -1,0 +1,208 @@
+<!--
+  This page describes OtoClaw, a project still in its plan-and-scaffold phase (see
+  OTOCLAW_PLAN.md / ARCHITECTURE.md). It was crafted for OtoClaw's own identity by a human
+  engineer using Claude Code, in an environment with no live OtoClaw session available to
+  do the dogfooding itself. We do not claim this page was "built with OtoClaw" — that
+  would not be true yet. It is designed to reflect what OtoClaw is building toward.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>OtoClaw — the open, local, autonomous agent</title>
+	<meta name="description" content="OtoClaw is an open-source, fully local, autonomous agent platform: a real terminal and native app, sub-agent orchestration, deep tool integrations, and a mascot that shows its work." />
+	<link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+	<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+	<header class="site-header">
+		<div class="wrap">
+			<a class="brand" href="#top">
+				<img src="assets/logo.svg" alt="" width="34" height="34" />
+				<span>OtoClaw<small>local-first agent platform</small></span>
+			</a>
+			<nav class="nav-links">
+				<a href="#features">Features</a>
+				<a href="#download">Download</a>
+				<a href="#opensource">Open source</a>
+			</nav>
+			<div class="nav-cta">
+				<a class="btn btn-ghost btn-sm" href="https://github.com/otoclaw/otoclaw" target="_blank" rel="noopener">GitHub</a>
+				<a class="btn btn-primary btn-sm" href="#download">Download</a>
+			</div>
+		</div>
+	</header>
+
+	<main id="top">
+		<section class="hero">
+			<div class="wrap hero-grid">
+				<div>
+					<span class="eyebrow">v0 &middot; open source &middot; no cloud required</span>
+					<h1>An agent that runs<br /><em>on your machine</em>, not someone&nbsp;else&rsquo;s.</h1>
+					<p class="lede">
+						OtoClaw is a fully local, autonomous agent platform: one brain across a
+						bespoke terminal and a real native app, sub-agents it spawns on its own,
+						and deep tool integrations &mdash; all open source, no lock-in.
+					</p>
+					<div class="hero-actions">
+						<a class="btn btn-primary" href="#download">Download OtoClaw</a>
+						<a class="btn btn-ghost" href="https://github.com/otoclaw/otoclaw" target="_blank" rel="noopener">View on GitHub</a>
+					</div>
+					<div class="hero-meta">
+						<span><strong>Local-first</strong> &mdash; your keys, your machine</span>
+						<span><strong>Apache-2.0</strong> &mdash; source open</span>
+						<span><strong>Multi-model</strong> &mdash; bring any provider</span>
+					</div>
+				</div>
+
+				<div class="hero-visual">
+					<div class="mascot-glow" aria-hidden="true"></div>
+					<div class="term-card">
+						<div class="term-titlebar">
+							<span></span><span></span><span></span>
+							<b>otoclaw &mdash; session</b>
+						</div>
+						<div class="term-body">
+							<div class="line-prompt">otoclaw run <span class="tag">"ship the landing page"</span></div>
+							<div><span class="dim">plan</span> &nbsp;split into 4 steps, routing 2 to sub-agents</div>
+							<div><span class="dim">agent</span> spawned <span class="tag">sub-agent:copy</span>, <span class="tag">sub-agent:layout</span></div>
+							<div><span class="ok">✓</span> tool <span class="tag">mcp:github</span> opened PR #142</div>
+							<div><span class="ok">✓</span> self-review passed &mdash; taste loop: <span class="ok">good</span></div>
+							<div class="dim">&nbsp;</div>
+							<div class="term-mascot">
+								<span class="eyes"><i></i><i></i></span>
+								<small>mascot state: task complete</small>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section id="features">
+			<div class="wrap">
+				<div class="section-head">
+					<span class="eyebrow">what it is</span>
+					<h2>One agent, every surface it needs.</h2>
+					<p>OtoClaw doesn&rsquo;t bolt features onto a chat window. It's a daemon with a real
+						pipeline &mdash; planning, routing, sub-agents, judgment &mdash; wired into the
+						tools that pipeline actually needs.</p>
+				</div>
+
+				<div class="feature-grid">
+					<article class="feature-card wide">
+						<div class="icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
+						</div>
+						<h3>Terminal, and a real native app</h3>
+						<p>A bespoke terminal UI for the keyboard-first workflow, plus a genuine native
+							desktop app &mdash; no Chromium wrapper. Both speak the same protocol to the
+							same local daemon, so nothing ever gets out of sync.</p>
+					</article>
+
+					<article class="feature-card">
+						<div class="icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="M9 8.5l3 6.5M15 8.5l-3 6.5"/></svg>
+						</div>
+						<h3>Sub-agent orchestration</h3>
+						<p>The main agent spawns sub-agents on its own, briefs them precisely, and
+							merges their work back &mdash; researching and building in parallel.</p>
+					</article>
+
+					<article class="feature-card">
+						<div class="icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+						</div>
+						<h3>Deep MCP integrations</h3>
+						<p>Blender modeling, Unity game dev, GitHub, YouTube &mdash; wired in as MCP
+							tool servers, not one-off scripts.</p>
+					</article>
+
+					<article class="feature-card">
+						<div class="icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M4 12c2.5-5 5.5-7.5 8-7.5s5.5 2.5 8 7.5c-2.5 5-5.5 7.5-8 7.5S6.5 17 4 12z"/><circle cx="12" cy="12" r="2.3" fill="currentColor" stroke="none"/></svg>
+						</div>
+						<h3>Browser bridge, orange cursor</h3>
+						<p>A custom extension drives Gmail, Calendar, and the sites OtoClaw just
+							built &mdash; with its own visible cursor, orange and unmistakably itself,
+							so you can watch it act.</p>
+					</article>
+
+					<article class="feature-card">
+						<div class="icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="3.4"/></svg>
+						</div>
+						<h3>Sees your screen</h3>
+						<p>Screen reading and vision let it look at what you&rsquo;re looking at,
+							then reason about it instead of guessing blind.</p>
+					</article>
+
+					<article class="feature-card wide">
+						<div class="icon">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M12 2.5l7.5 4.3v9.4L12 20.5l-7.5-4.3V6.8L12 2.5z"/><path d="M12 2.5v18M4.5 6.8l7.5 4.3 7.5-4.3"/></svg>
+						</div>
+						<h3>Open source, Apache-2.0</h3>
+						<p>Local-first and source-open by design &mdash; no cloud dependency, no
+							lock-in. Fork it, audit it, run it fully offline against your own models.</p>
+					</article>
+				</div>
+			</div>
+		</section>
+
+		<section id="download">
+			<div class="wrap">
+				<div class="download-panel">
+					<div class="download-copy">
+						<span class="eyebrow">get otoclaw</span>
+						<h2>Pick your platform.</h2>
+						<p>OtoClaw is early &mdash; v0, plan &amp; roadmap stage. Builds below are placeholders
+							until the first release lands on GitHub.</p>
+					</div>
+					<div class="platform-row">
+						<button type="button" class="platform-btn" disabled>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 5.5l7.5-1v7H3v-6zM11.5 4.3L21 3v8.4h-9.5V4.3zM3 12.5h7.5v7l-7.5-1v-6zM11.5 12.5H21V21l-9.5-1.3v-7.2z"/></svg>
+							<span><span class="platform-name">Windows</span><span class="platform-note">coming soon</span></span>
+						</button>
+						<button type="button" class="platform-btn" disabled>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M16.4 12.3c0-2.5 2-3.7 2.1-3.8-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.6.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1.9-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8 1.5 0 1.9.8 3.2.7 1.3 0 2.2-1.2 3-2.4.7-1 1.2-2.1 1.4-2.1-.1 0-2.8-1-2.8-3.4z"/><path d="M13.8 5.1c.6-.8 1-1.9.9-3-1 0-2.2.6-2.9 1.5-.6.7-1.1 1.8-1 2.9 1.1.1 2.3-.6 3-1.4z"/></svg>
+							<span><span class="platform-name">macOS</span><span class="platform-note">coming soon</span></span>
+						</button>
+						<button type="button" class="platform-btn" disabled>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M9 4.5c.6-1.3 1.7-2 3-2s2.4.7 3 2M8 18.5l-1.5 2M16 18.5l1.5 2"/><path d="M6.5 8.5c0-2.5 2.5-4.5 5.5-4.5s5.5 2 5.5 4.5c1.6.4 2.5 1.6 2.5 3 0 1.9-1.7 3.3-3.7 3.3-.6 1.7-2.3 2.9-4.3 2.9s-3.7-1.2-4.3-2.9c-2 0-3.7-1.4-3.7-3.3 0-1.4.9-2.6 2.5-3z"/></svg>
+							<span><span class="platform-name">Linux</span><span class="platform-note">coming soon</span></span>
+						</button>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section id="opensource" class="oss-strip">
+			<div class="wrap">
+				<div class="oss-copy">
+					<span class="license-badge">Apache-2.0</span>
+					<p>Every package in this monorepo is source-open. Read the code, self-host the
+						daemon, or send a pull request.</p>
+				</div>
+				<a class="btn btn-ghost" href="https://github.com/otoclaw/otoclaw" target="_blank" rel="noopener">Browse the repository</a>
+			</div>
+		</section>
+	</main>
+
+	<footer>
+		<div class="wrap">
+			<a class="footer-brand" href="#top">
+				<img src="assets/logo.svg" alt="" width="22" height="22" />
+				<span>OtoClaw</span>
+			</a>
+			<nav class="foot-links">
+				<a href="#features">Features</a>
+				<a href="#download">Download</a>
+				<a href="https://github.com/otoclaw/otoclaw" target="_blank" rel="noopener">GitHub</a>
+				<a href="https://github.com/otoclaw/otoclaw/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+			</nav>
+			<span class="copyright">&copy; 2026 OtoClaw &middot; Apache-2.0</span>
+		</div>
+	</footer>
+</body>
+</html>

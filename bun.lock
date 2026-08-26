@@ -27,6 +27,13 @@
         "@otoclaw/shared": "workspace:*",
       },
     },
+    "apps/website": {
+      "name": "@otoclaw/website",
+      "version": "0.0.0",
+      "devDependencies": {
+        "playwright": "^1.48.0",
+      },
+    },
     "packages/agent": {
       "name": "@otoclaw/agent",
       "version": "0.0.0",
@@ -209,6 +216,8 @@
     "@otoclaw/tools": ["@otoclaw/tools@workspace:packages/tools"],
 
     "@otoclaw/vision": ["@otoclaw/vision@workspace:packages/vision"],
+
+    "@otoclaw/website": ["@otoclaw/website@workspace:apps/website"],
 
     "@types/bun": ["@types/bun@1.4.0", "", { "dependencies": { "bun-types": "1.4.0" } }, "sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ=="],
 

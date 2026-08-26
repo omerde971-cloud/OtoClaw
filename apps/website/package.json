@@ -1,0 +1,14 @@
+{
+	"name": "@otoclaw/website",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "bun run build.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test test/render.test.ts"
+	},
+	"devDependencies": {
+		"playwright": "^1.48.0"
+	}
+}

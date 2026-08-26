@@ -1,0 +1,21 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="otoclawLogoTitle">
+	<title id="otoclawLogoTitle">OtoClaw mascot</title>
+	<rect x="4" y="2" width="6" height="9" rx="3" fill="#3a352c" />
+	<rect x="10" y="12" width="44" height="42" rx="14" fill="#f2ead9" />
+	<rect x="10" y="12" width="44" height="42" rx="14" fill="url(#otoclawHeadShade)" fill-opacity="0.5" />
+	<rect x="17" y="24" width="30" height="20" rx="8" fill="#151210" />
+	<rect x="24" y="30" width="4.5" height="10" rx="2.25" fill="#fff6e6">
+		<animate attributeName="opacity" values="1;0.35;1" dur="2.6s" repeatCount="indefinite" />
+	</rect>
+	<rect x="35.5" y="30" width="4.5" height="10" rx="2.25" fill="#fff6e6">
+		<animate attributeName="opacity" values="1;0.35;1" dur="2.6s" repeatCount="indefinite" />
+	</rect>
+	<rect x="4" y="26" width="6" height="14" rx="3" fill="#1c1814" />
+	<rect x="54" y="26" width="6" height="14" rx="3" fill="#1c1814" />
+	<defs>
+		<linearGradient id="otoclawHeadShade" x1="10" y1="12" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+			<stop stop-color="#ff8a3d" stop-opacity="0.15" />
+			<stop offset="1" stop-color="#ff8a3d" stop-opacity="0" />
+		</linearGradient>
+	</defs>
+</svg>
