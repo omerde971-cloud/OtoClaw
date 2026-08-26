@@ -216,6 +216,29 @@ export interface ErrorEventPayload {
 	recoverable: boolean;
 }
 
+export interface SkillListParams {
+	[key: string]: never;
+}
+
+export interface SkillInfo {
+	name: string;
+	description: string;
+	triggers: string[];
+	version: string;
+	source: string;
+}
+
+export type SkillListResult = SkillInfo[];
+
+export interface SkillInstallParams {
+	name: string;
+}
+
+export type SkillInstallResult = OkResult;
+
+export type SkillListRequest = JsonRpcRequest<"skill.list", SkillListParams>;
+export type SkillInstallRequest = JsonRpcRequest<"skill.install", SkillInstallParams>;
+
 export type StreamDeltaNotification = JsonRpcNotification<"stream.delta", StreamDeltaPayload>;
 export type PipelineStageNotification = JsonRpcNotification<"pipeline.stage", PipelineStagePayload>;
 export type ToolStartNotification = JsonRpcNotification<"tool.start", ToolStartPayload>;
