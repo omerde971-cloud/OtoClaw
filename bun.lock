@@ -90,6 +90,15 @@
         "@otoclaw/shared": "workspace:*",
       },
     },
+    "packages/plugins": {
+      "name": "@otoclaw/plugins",
+      "version": "0.0.0",
+      "dependencies": {
+        "@otoclaw/mcp": "workspace:*",
+        "@otoclaw/shared": "workspace:*",
+        "@otoclaw/skills": "workspace:*",
+      },
+    },
     "packages/providers": {
       "name": "@otoclaw/providers",
       "version": "0.0.0",
@@ -199,6 +208,8 @@
     "@otoclaw/mcp": ["@otoclaw/mcp@workspace:packages/mcp"],
 
     "@otoclaw/permission": ["@otoclaw/permission@workspace:packages/permission"],
+
+    "@otoclaw/plugins": ["@otoclaw/plugins@workspace:packages/plugins"],
 
     "@otoclaw/providers": ["@otoclaw/providers@workspace:packages/providers"],
 
