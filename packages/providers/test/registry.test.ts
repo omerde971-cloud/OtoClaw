@@ -47,4 +47,22 @@ describe("registry.resolve", () => {
 		expect(resolved.provider.id).toBe("ollama");
 		expect(resolved.apiKey).toBeNull();
 	});
+
+	test("routes claude-cli to the cli-delegate adapter without requiring a key", async () => {
+		const keyStore = new MemoryKeyStore();
+		const resolved = await resolve("claude-cli/cli-default", keyStore);
+		expect(resolved.provider.id).toBe("claude-cli");
+		expect(resolved.model).toBe("cli-default");
+		expect(resolved.apiKey).toBeNull();
+		const models = await resolved.provider.listModels();
+		expect(models[0]?.provider).toBe("claude");
+	});
+
+	test("routes codex-cli to the cli-delegate adapter without requiring a key", async () => {
+		const keyStore = new MemoryKeyStore();
+		const resolved = await resolve("codex-cli/cli-default", keyStore);
+		expect(resolved.provider.id).toBe("codex-cli");
+		const models = await resolved.provider.listModels();
+		expect(models[0]?.provider).toBe("codex");
+	});
 });

@@ -1,4 +1,5 @@
 import { createAnthropicProvider } from "./anthropic";
+import { createCliDelegateProvider } from "./cli-delegate";
 import type { KeyStore } from "./keychain";
 import { createOpenAICompatProvider } from "./openai-compat";
 import type { Provider } from "./types";
@@ -18,8 +19,9 @@ export class UnknownProviderError extends Error {
 }
 
 interface ProviderConfig {
-	adapter: "openai-compat" | "anthropic";
+	adapter: "openai-compat" | "anthropic" | "cli-delegate";
 	baseUrl?: string;
+	cliBinary?: "claude" | "codex";
 	requiresKey: boolean;
 }
 
@@ -49,6 +51,16 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
 		adapter: "openai-compat",
 		baseUrl: "https://api.openai.com/v1",
 		requiresKey: true,
+	},
+	"claude-cli": {
+		adapter: "cli-delegate",
+		cliBinary: "claude",
+		requiresKey: false,
+	},
+	"codex-cli": {
+		adapter: "cli-delegate",
+		cliBinary: "codex",
+		requiresKey: false,
 	},
 };
 
@@ -85,14 +97,21 @@ export async function resolve(
 		throw new MissingApiKeyError(providerId);
 	}
 
-	const provider: Provider =
-		config.adapter === "anthropic"
-			? createAnthropicProvider({ apiKey: apiKey ?? undefined })
-			: createOpenAICompatProvider({
-					id: providerId,
-					baseUrl: config.baseUrl ?? "",
-					apiKey: apiKey ?? undefined,
-				});
+	let provider: Provider;
+	if (config.adapter === "anthropic") {
+		provider = createAnthropicProvider({ apiKey: apiKey ?? undefined });
+	} else if (config.adapter === "cli-delegate") {
+		provider = createCliDelegateProvider({
+			binary: config.cliBinary ?? "claude",
+			id: providerId,
+		});
+	} else {
+		provider = createOpenAICompatProvider({
+			id: providerId,
+			baseUrl: config.baseUrl ?? "",
+			apiKey: apiKey ?? undefined,
+		});
+	}
 
 	return { provider, model, apiKey };
 }
