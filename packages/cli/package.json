@@ -1,0 +1,13 @@
+{
+	"name": "@otoclaw/cli",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"main": "src/index.ts",
+	"dependencies": {
+		"@otoclaw/shared": "workspace:*"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	}
+}
