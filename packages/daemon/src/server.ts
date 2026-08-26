@@ -1,16 +1,65 @@
+import { randomUUID } from "node:crypto";
 import { chmodSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Database } from "bun:sqlite";
 import {
+	type AgentEvents,
+	NodeAgentEvents,
+	runTask,
+} from "@otoclaw/agent";
+import { PermissionEngine, type SessionOverrides } from "@otoclaw/permission";
+import {
+	KNOWN_PROVIDER_IDS,
+	NapiKeyStore,
+	type KeyStore,
+	type ResolvedProvider,
+	resolve as resolveProviderSpec,
+} from "@otoclaw/providers";
+import {
+	ConfigSchema,
 	DaemonRuntimeInfoSchema,
+	type ConfigSetParams,
 	type EchoNotification,
+	type ErrorEventPayload,
+	type JsonRpcNotification,
 	type JsonRpcRequest,
 	type JsonRpcResponse,
+	type MascotStatePayload,
+	type MessageSendParams,
+	type ModeSetParams,
+	type ModelInfo,
+	type ModelSetParams,
+	type PermissionRequestPayload,
+	type PermissionRespondParams,
+	type ProviderAddKeyParams,
+	type QuestionAskPayload,
+	type QuestionRespondParams,
+	type RunCancelParams,
 } from "@otoclaw/shared";
-import { createSession, otoclawDir } from "./store";
+import { defaultToolRegistry } from "@otoclaw/tools";
+import { DaemonPermissionChannel, DaemonQuestionChannel, type PendingPermission, type PendingQuestion } from "./channels";
+import { loadConfig, saveConfig } from "./config";
+import { stageMascotState, toolMascotState } from "./mascot";
+import { createSession, getSession, otoclawDir } from "./store";
 
 interface WsData {
 	authenticated: true;
+}
+
+type WsLike = { send: (data: string) => void };
+
+interface SessionState {
+	sessionId: string;
+	cwd: string;
+	mode: "manual" | "auto";
+	model?: string;
+	sessionOverrides: SessionOverrides;
+}
+
+export interface StartServerOptions {
+	/** Test-mode injection point: override how a "provider/model" spec resolves to a real Provider. */
+	resolveProvider?: (spec: string, keyStore: KeyStore) => Promise<ResolvedProvider>;
+	keyStore?: KeyStore;
 }
 
 export interface DaemonServer {
@@ -20,8 +69,64 @@ export interface DaemonServer {
 	stop: () => void;
 }
 
-export function startServer(db: Database): DaemonServer {
+export function startServer(db: Database, options: StartServerOptions = {}): DaemonServer {
 	const token = crypto.randomUUID();
+	const keyStore = options.keyStore ?? new NapiKeyStore();
+	const resolveProvider = options.resolveProvider ?? resolveProviderSpec;
+
+	const clients = new Set<WsLike>();
+	const sessionStates = new Map<string, SessionState>();
+	const pendingPermissions = new Map<string, PendingPermission>();
+	const pendingQuestions = new Map<string, PendingQuestion>();
+	const runAbortControllers = new Map<string, AbortController>();
+	const lastCost = new Map<string, { tokensIn: number; tokensOut: number; usd: number }>();
+
+	function broadcast<TMethod extends string, TParams>(notification: JsonRpcNotification<TMethod, TParams>): void {
+		const raw = JSON.stringify(notification);
+		for (const client of clients) client.send(raw);
+	}
+
+	function sendMascot(sessionId: string, state: string): void {
+		const payload: MascotStatePayload = { sessionId, state, since: new Date().toISOString() };
+		broadcast({ jsonrpc: "2.0", method: "mascot.state", params: payload });
+	}
+
+	function getOrCreateState(sessionId: string): SessionState {
+		const existing = sessionStates.get(sessionId);
+		if (existing) return existing;
+		const session = getSession(db, sessionId);
+		if (!session) throw new Error(`unknown session "${sessionId}"`);
+		const state: SessionState = { sessionId, cwd: session.cwd, mode: session.mode, sessionOverrides: {} };
+		sessionStates.set(sessionId, state);
+		return state;
+	}
+
+	function wireEvents(sessionId: string): AgentEvents {
+		const events = new NodeAgentEvents();
+		events.on("stream.delta", ({ text }) => {
+			broadcast({ jsonrpc: "2.0", method: "stream.delta", params: { sessionId, text } });
+		});
+		events.on("pipeline.stage", ({ stage, detail }) => {
+			broadcast({ jsonrpc: "2.0", method: "pipeline.stage", params: { sessionId, stage, detail } });
+			const mascot = stageMascotState(stage);
+			if (mascot) sendMascot(sessionId, mascot);
+		});
+		events.on("tool.start", ({ toolCallId, name, args }) => {
+			broadcast({ jsonrpc: "2.0", method: "tool.start", params: { sessionId, toolCallId, name, args } });
+			sendMascot(sessionId, toolMascotState(name));
+		});
+		events.on("tool.end", ({ toolCallId, name, result }) => {
+			broadcast({ jsonrpc: "2.0", method: "tool.end", params: { sessionId, toolCallId, name, result } });
+		});
+		events.on("permission.request", () => {
+			sendMascot(sessionId, "waiting");
+		});
+		events.on("error", (payload) => {
+			const params: ErrorEventPayload = { sessionId, ...payload };
+			broadcast({ jsonrpc: "2.0", method: "error", params });
+		});
+		return events;
+	}
 
 	const server = Bun.serve<WsData>({
 		hostname: "127.0.0.1",
@@ -40,6 +145,12 @@ export function startServer(db: Database): DaemonServer {
 			return new Response("Not found", { status: 404 });
 		},
 		websocket: {
+			open(ws) {
+				clients.add(ws);
+			},
+			close(ws) {
+				clients.delete(ws);
+			},
 			message(ws, raw) {
 				let request: JsonRpcRequest;
 				try {
@@ -56,7 +167,7 @@ export function startServer(db: Database): DaemonServer {
 				}
 
 				try {
-					handleRequest(db, ws, request);
+					handleRequest(request, ws);
 				} catch (err) {
 					const response: JsonRpcResponse = {
 						jsonrpc: "2.0",
@@ -71,6 +182,194 @@ export function startServer(db: Database): DaemonServer {
 			},
 		},
 	});
+
+	function reply(ws: WsLike, id: number | string, result: unknown): void {
+		const response: JsonRpcResponse = { jsonrpc: "2.0", id, result };
+		ws.send(JSON.stringify(response));
+	}
+
+	function replyError(ws: WsLike, id: number | string, message: string, code = -32603): void {
+		const response: JsonRpcResponse = { jsonrpc: "2.0", id, error: { code, message } };
+		ws.send(JSON.stringify(response));
+	}
+
+	async function runMessage(sessionId: string, text: string): Promise<void> {
+		const state = getOrCreateState(sessionId);
+		const model = state.model ?? loadConfig().model;
+		if (!model) {
+			broadcast({
+				jsonrpc: "2.0",
+				method: "error",
+				params: { sessionId, code: "no_model", message: "no model set for session; call model.set first", recoverable: true } satisfies ErrorEventPayload,
+			});
+			return;
+		}
+
+		const abortController = new AbortController();
+		runAbortControllers.set(sessionId, abortController);
+		const events = wireEvents(sessionId);
+
+		try {
+			const { provider, model: resolvedModel } = await resolveProvider(model, keyStore);
+			const permissionChannel = new DaemonPermissionChannel(sessionId, pendingPermissions, state.sessionOverrides, (payload) => {
+				broadcast({ jsonrpc: "2.0", method: "permission.request", params: payload satisfies PermissionRequestPayload });
+			});
+			const questionChannel = new DaemonQuestionChannel(sessionId, pendingQuestions, (payload) => {
+				broadcast({ jsonrpc: "2.0", method: "question.ask", params: payload satisfies QuestionAskPayload });
+				sendMascot(sessionId, "waiting");
+			});
+
+			await runTask(
+				{
+					session: { id: sessionId, cwd: state.cwd, mode: state.mode, createdAt: new Date().toISOString() },
+					provider,
+					model: resolvedModel,
+					toolRegistry: defaultToolRegistry,
+					toolContext: { cwd: state.cwd, sessionId },
+					permissionEngine: new PermissionEngine(),
+					mode: state.mode,
+					sessionOverrides: state.sessionOverrides,
+					projectPolicy: null,
+					globalConfig: loadConfig(),
+					questionChannel,
+					permissionChannel,
+					events,
+					signal: abortController.signal,
+				},
+				{ userText: text },
+			);
+
+			lastCost.set(sessionId, { tokensIn: 0, tokensOut: 0, usd: 0 });
+			broadcast({
+				jsonrpc: "2.0",
+				method: "cost.update",
+				params: { sessionId, ...lastCost.get(sessionId) },
+			});
+			sendMascot(sessionId, "done");
+		} catch (err) {
+			broadcast({
+				jsonrpc: "2.0",
+				method: "error",
+				params: {
+					sessionId,
+					code: "run_failed",
+					message: err instanceof Error ? err.message : "run failed",
+					recoverable: true,
+				} satisfies ErrorEventPayload,
+			});
+		} finally {
+			runAbortControllers.delete(sessionId);
+		}
+	}
+
+	function handleRequest(request: JsonRpcRequest, ws: WsLike): void {
+		switch (request.method) {
+			case "session.create": {
+				const params = request.params as { cwd: string; mode: "manual" | "auto" };
+				const session = createSession(db, params.cwd, params.mode);
+				sessionStates.set(session.id, {
+					sessionId: session.id,
+					cwd: session.cwd,
+					mode: session.mode,
+					sessionOverrides: {},
+				});
+				reply(ws, request.id, { sessionId: session.id });
+				return;
+			}
+			case "echo.send": {
+				const params = request.params as { sessionId: string; message: string };
+				reply(ws, request.id, { ok: true });
+				const notification: EchoNotification = {
+					jsonrpc: "2.0",
+					method: "echo",
+					params: { sessionId: params.sessionId, message: params.message, ts: new Date().toISOString() },
+				};
+				ws.send(JSON.stringify(notification));
+				return;
+			}
+			case "message.send": {
+				const params = request.params as MessageSendParams;
+				const messageId = randomUUID();
+				reply(ws, request.id, { messageId });
+				void runMessage(params.sessionId, params.text);
+				return;
+			}
+			case "run.cancel": {
+				const params = request.params as RunCancelParams;
+				runAbortControllers.get(params.sessionId)?.abort();
+				reply(ws, request.id, { ok: true });
+				return;
+			}
+			case "mode.set": {
+				const params = request.params as ModeSetParams;
+				const state = getOrCreateState(params.sessionId);
+				state.mode = params.mode;
+				reply(ws, request.id, { ok: true });
+				return;
+			}
+			case "model.set": {
+				const params = request.params as ModelSetParams;
+				const state = getOrCreateState(params.sessionId);
+				state.model = params.model;
+				reply(ws, request.id, { ok: true });
+				return;
+			}
+			case "model.list": {
+				void (async () => {
+					const all: ModelInfo[] = [];
+					for (const providerId of KNOWN_PROVIDER_IDS) {
+						try {
+							const { provider } = await resolveProvider(`${providerId}/placeholder`, keyStore);
+							all.push(...(await provider.listModels()));
+						} catch {
+							// provider unavailable (no key configured, unreachable, etc.) — skip it
+						}
+					}
+					reply(ws, request.id, all);
+				})();
+				return;
+			}
+			case "permission.respond": {
+				const params = request.params as PermissionRespondParams;
+				const pending = pendingPermissions.get(params.requestId);
+				if (pending) {
+					pending.resolve(params.decision);
+					pendingPermissions.delete(params.requestId);
+				}
+				reply(ws, request.id, { ok: true });
+				return;
+			}
+			case "question.respond": {
+				const params = request.params as QuestionRespondParams;
+				const pending = pendingQuestions.get(params.questionId);
+				if (pending) {
+					pending.resolve({ optionId: params.optionId, freeText: params.freeText });
+					pendingQuestions.delete(params.questionId);
+				}
+				reply(ws, request.id, { ok: true });
+				return;
+			}
+			case "config.get": {
+				reply(ws, request.id, loadConfig());
+				return;
+			}
+			case "config.set": {
+				const params = request.params as ConfigSetParams;
+				const merged = ConfigSchema.parse({ ...loadConfig(), ...params.patch });
+				saveConfig(merged);
+				reply(ws, request.id, { ok: true });
+				return;
+			}
+			case "provider.addKey": {
+				const params = request.params as ProviderAddKeyParams;
+				void keyStore.set(params.provider, params.key).then(() => reply(ws, request.id, { ok: true }));
+				return;
+			}
+			default: {
+				replyError(ws, request.id, "Method not found", -32601);
+			}
+		}
+	}
 
 	const runtimeInfo = DaemonRuntimeInfoSchema.parse({
 		port: server.port,
@@ -99,53 +398,4 @@ export function startServer(db: Database): DaemonServer {
 			}
 		},
 	};
-}
-
-function handleRequest(
-	db: Database,
-	ws: { send: (data: string) => void },
-	request: JsonRpcRequest,
-): void {
-	switch (request.method) {
-		case "session.create": {
-			const params = request.params as { cwd: string; mode: "manual" | "auto" };
-			const session = createSession(db, params.cwd, params.mode);
-			const response: JsonRpcResponse = {
-				jsonrpc: "2.0",
-				id: request.id,
-				result: { sessionId: session.id },
-			};
-			ws.send(JSON.stringify(response));
-			return;
-		}
-		case "echo.send": {
-			const params = request.params as { sessionId: string; message: string };
-			const response: JsonRpcResponse = {
-				jsonrpc: "2.0",
-				id: request.id,
-				result: { ok: true },
-			};
-			ws.send(JSON.stringify(response));
-
-			const notification: EchoNotification = {
-				jsonrpc: "2.0",
-				method: "echo",
-				params: {
-					sessionId: params.sessionId,
-					message: params.message,
-					ts: new Date().toISOString(),
-				},
-			};
-			ws.send(JSON.stringify(notification));
-			return;
-		}
-		default: {
-			const response: JsonRpcResponse = {
-				jsonrpc: "2.0",
-				id: request.id,
-				error: { code: -32601, message: "Method not found" },
-			};
-			ws.send(JSON.stringify(response));
-		}
-	}
 }

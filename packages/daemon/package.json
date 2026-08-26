@@ -5,7 +5,11 @@
 	"type": "module",
 	"main": "src/main.ts",
 	"dependencies": {
-		"@otoclaw/shared": "workspace:*"
+		"@otoclaw/shared": "workspace:*",
+		"@otoclaw/agent": "workspace:*",
+		"@otoclaw/providers": "workspace:*",
+		"@otoclaw/tools": "workspace:*",
+		"@otoclaw/permission": "workspace:*"
 	},
 	"scripts": {
 		"dev": "bun run src/main.ts",

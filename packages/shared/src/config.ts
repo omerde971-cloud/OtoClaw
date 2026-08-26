@@ -26,6 +26,7 @@ export type Policy = z.infer<typeof PolicySchema>;
 
 export const ConfigSchema = z.object({
 	mode: z.enum(["manual", "auto"]).default("manual"),
+	model: z.string().optional(),
 	permissions: z.record(z.string(), PermissionDecisionValueSchema).default({}),
 	// Sandbox is a hard invariant in Auto mode (see permission/engine.ts); this only
 	// selects sandbox depth, it can never disable sandboxing while mode === "auto".

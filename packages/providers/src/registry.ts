@@ -52,6 +52,9 @@ const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
 	},
 };
 
+/** Provider ids known to the registry, exposed for callers (e.g. model.list) that need to enumerate them. */
+export const KNOWN_PROVIDER_IDS: string[] = Object.keys(PROVIDER_CONFIGS);
+
 export interface ResolvedProvider {
 	provider: Provider;
 	model: string;
