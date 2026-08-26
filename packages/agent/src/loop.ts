@@ -207,6 +207,8 @@ export interface RunTaskResult {
 	stepResults: StepResult[];
 	review: ReviewResult;
 	verdicts: Verdict[];
+	/** True once the Auto-mode plan-level self-repair (see runAutoReplan) has been attempted. */
+	autoReplanAttempted: boolean;
 }
 
 async function executeStep(step: PlanStep, route: Route, ctx: RunContext, testCommand: string): Promise<StepResult> {
@@ -291,6 +293,81 @@ export async function judgeAndRepair(step: PlanStep, ctx: RunContext): Promise<S
 }
 
 /**
+ * Auto mode is allowed exactly one plan-level self-repair pass per run. Any more than that risks
+ * an unbounded plan -> fail -> replan -> fail cycle, so this is a hard cap, not a tuning knob.
+ */
+const MAX_AUTO_REPLAN_ATTEMPTS = 1;
+
+export interface AutoReplanOutcome {
+	/** IDs of originally-unresolved steps that the corrective steps fully resolved. */
+	resolvedStepIds: Set<string>;
+	replanStepResults: StepResult[];
+	verdicts: Verdict[];
+}
+
+/**
+ * Plan-level self-repair for Auto mode: re-invokes the planner with the failed steps' descriptions
+ * and notes folded into the prompt, then runs whatever corrective steps it proposes through the
+ * same route -> execute -> judge/repair pipeline as a normal step. Only called when one or more
+ * steps finished unresolved; the caller bounds how many times this runs (MAX_AUTO_REPLAN_ATTEMPTS).
+ */
+async function runAutoReplan(
+	ctx: RunContext,
+	plan: Plan,
+	taskIntake: TaskIntake,
+	unresolved: StepResult[],
+	testCommand: string,
+): Promise<AutoReplanOutcome> {
+	ctx.events.emit("pipeline.stage", { stage: "auto-replan" });
+
+	const failureSummary = unresolved
+		.map((r) => {
+			const step = plan.steps.find((s) => s.id === r.stepId);
+			const description = step?.description ?? r.stepId;
+			const notes = r.notes.join("; ") || "yok";
+			return `- ${description} (notlar: ${notes})`;
+		})
+		.join("\n");
+
+	const replanIntake: TaskIntake = {
+		userText: `${taskIntake.userText}\n\nŞu adımlar başarısız oldu:\n${failureSummary}\n\nBunları düzeltecek yeni/düzeltici adımlar öner.`,
+		clarification: taskIntake.clarification,
+	};
+
+	const replanPlan = await planner(replanIntake, ctx.provider, ctx.model, ctx.signal);
+	const replanStepResults: StepResult[] = [];
+	const verdicts: Verdict[] = [];
+
+	for (const step of replanPlan.steps) {
+		let route: Route;
+		try {
+			route = router(step);
+		} catch (err) {
+			if (err instanceof UnsupportedRouteError) {
+				replanStepResults.push({ stepId: step.id, ok: false, notes: [err.message] });
+				continue;
+			}
+			throw err;
+		}
+
+		const result = await executeStep(step, route, ctx, testCommand);
+		if (result.ok) {
+			const outcome = await judgeAndRepair(step, ctx);
+			verdicts.push(...outcome.verdicts);
+			if (!outcome.accepted) {
+				result.ok = false;
+				result.notes.push("judge rejected the output and the user chose to cancel");
+			}
+		}
+		replanStepResults.push(result);
+	}
+
+	const resolved = replanStepResults.length > 0 && replanStepResults.every((r) => r.ok);
+	const resolvedStepIds = resolved ? new Set(unresolved.map((r) => r.stepId)) : new Set<string>();
+	return { resolvedStepIds, replanStepResults, verdicts };
+}
+
+/**
  * Implements ARCHITECTURE.md §6's runTask pseudocode: intake -> plan -> route -> execute each
  * step -> review -> deliver. Emits `pipeline.stage` at each transition.
  */
@@ -334,6 +411,26 @@ export async function runTask(ctx: RunContext, input: RunTaskInput): Promise<Run
 		stepResults.push(result);
 	}
 
+	let autoReplanAttempted = false;
+	if (ctx.mode === "auto") {
+		for (let attempt = 0; attempt < MAX_AUTO_REPLAN_ATTEMPTS; attempt++) {
+			const unresolved = stepResults.filter((r) => !r.ok);
+			if (unresolved.length === 0) break;
+
+			const outcome = await runAutoReplan(ctx, plan, taskIntake, unresolved, testCommand);
+			autoReplanAttempted = true;
+			verdicts.push(...outcome.verdicts);
+			stepResults.push(...outcome.replanStepResults);
+
+			for (const r of stepResults) {
+				if (outcome.resolvedStepIds.has(r.stepId) && !r.ok) {
+					r.ok = true;
+					r.notes.push("resolved via auto-replan corrective step");
+				}
+			}
+		}
+	}
+
 	ctx.events.emit("pipeline.stage", { stage: "review" });
 	const passed = stepResults.every((r) => r.ok);
 	const notes = stepResults.flatMap((r) => r.notes);
@@ -342,5 +439,5 @@ export async function runTask(ctx: RunContext, input: RunTaskInput): Promise<Run
 
 	ctx.events.emit("pipeline.stage", { stage: "deliver" });
 
-	return { intake: taskIntake, plan, stepResults, review, verdicts };
+	return { intake: taskIntake, plan, stepResults, review, verdicts, autoReplanAttempted };
 }

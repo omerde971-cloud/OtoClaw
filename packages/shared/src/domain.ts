@@ -13,7 +13,7 @@ export interface Message {
 	createdAt: string;
 }
 
-export type PipelineStage = "intake" | "plan" | "route" | "execute" | "review" | "deliver";
+export type PipelineStage = "intake" | "plan" | "route" | "execute" | "review" | "deliver" | "auto-replan";
 
 export type TaskStatus = "pending" | "running" | "blocked" | "done" | "failed";
 

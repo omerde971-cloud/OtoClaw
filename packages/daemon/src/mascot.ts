@@ -27,6 +27,8 @@ export function stageMascotState(stage: PipelineStage): MascotState | null {
 			return "building";
 		case "execute":
 			return null;
+		case "auto-replan":
+			return "planning";
 		case "review":
 			return "analyzing";
 		case "deliver":
